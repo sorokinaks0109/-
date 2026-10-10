@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ballet Forever">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%23B4436C'/%3E%3Ctext x='32' y='42' font-family='Georgia' font-style='italic' font-size='28' fill='white' text-anchor='middle'%3EBF%3C/text%3E%3C/svg%3E">
+<title>Ballet Forever</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: одна колонка телефона, шапка с балериной, нижнее меню из четырёх вкладок, всплывающие снизу листы для форм */
+:root {
+  --bg: #FBF3F5;
+  --surface: #FFFFFF;
+  --ink: #3A1730;
+  --muted: #86677A;
+  --accent: #B4436C;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #F5DCE5;
+  --line: #EDDAE1;
+  --ok: #2F7D5B;
+  --ok-soft: #DDF0E6;
+  --warn: #A9640F;
+  --warn-soft: #FBEBD3;
+  --bad: #B23A48;
+  --bad-soft: #F8DDE0;
+  --shadow: 0 1px 2px rgba(58,23,48,.06), 0 6px 20px rgba(58,23,48,.06);
+  --f-display: "Cormorant Garamond", "Georgia", "Times New Roman", serif;
+  --f-body: "Manrope", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1C1118; --surface: #281A23; --ink: #F6E8EE; --muted: #B796A8;
+    --accent: #E5809F; --accent-ink: #2A0F1E; --accent-soft: #46283A; --line: #3B2734;
+    --ok: #6CC49B; --ok-soft: #1F3A2D; --warn: #E8AA5A; --warn-soft: #3D2C17;
+    --bad: #F08390; --bad-soft: #452128; --shadow: 0 1px 2px rgba(0,0,0,.3);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1C1118; --surface: #281A23; --ink: #F6E8EE; --muted: #B796A8;
+  --accent: #E5809F; --accent-ink: #2A0F1E; --accent-soft: #46283A; --line: #3B2734;
+  --ok: #6CC49B; --ok-soft: #1F3A2D; --warn: #E8AA5A; --warn-soft: #3D2C17;
+  --bad: #F08390; --bad-soft: #452128; --shadow: 0 1px 2px rgba(0,0,0,.3);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 15px; line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 0 calc(96px + env(safe-area-inset-bottom, 0px)); }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums lining-nums; }
+.next .when b, .stat b { font-variant-numeric: tabular-nums lining-nums; }
+
+/* шапка */
+header.top { display: flex; align-items: center; gap: 12px; padding-block: 18px 8px; }
+.ballerina { width: 64px; height: 64px; flex: none; color: var(--accent); }
+.brand { flex: 1; min-width: 0; }
+.brand h1 { font-family: var(--f-display); font-style: italic; font-weight: 600; font-size: 32px; line-height: 1; letter-spacing: .01em; }
+.brand p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.iconbtn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; flex: none; }
+.iconbtn svg { width: 20px; height: 20px; }
+
+.screen { display: flex; flex-direction: column; gap: 20px; padding-top: 8px; }
+.sec-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sec-title h2 { font-family: var(--f-display); font-weight: 600; font-size: 24px; }
+.sec-title span { color: var(--muted); font-size: 13px; }
+.eyebrow { text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 700; color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.list { display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); min-height: 60px; }
+.row:first-child { border-top: 0; }
+.row .main { flex: 1; min-width: 0; }
+.row .name { font-weight: 600; overflow-wrap: anywhere; }
+.row .sub { color: var(--muted); font-size: 13px; }
+button.row { width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; }
+
+.avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; background: var(--accent-soft); color: var(--accent); flex: none; }
+
+.pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.mute { background: var(--line); color: var(--muted); }
+.pill.ex { background: transparent; border: 1px dashed var(--muted); color: var(--muted); font-weight: 500; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.small { min-height: 34px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
+.btn.ghost { background: transparent; }
+.btn.danger { color: var(--bad); }
+.btn.block { width: 100%; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* полоска остатка занятий */
+.meter { display: flex; gap: 3px; margin-top: 6px; flex-wrap: wrap; }
+.meter i { width: 10px; height: 6px; border-radius: 3px; background: var(--line); }
+.meter i.on { background: var(--accent); }
+
+/* ближайшее занятие */
+.next { padding: 16px; display: flex; gap: 14px; align-items: center; }
+.next .when { text-align: center; min-width: 64px; }
+.next .when b { display: block; font-family: var(--f-display); font-size: 30px; font-weight: 600; line-height: 1; }
+.next .when small { color: var(--muted); font-size: 12px; }
+.next .main { flex: 1; min-width: 0; }
+.next h3 { font-family: var(--f-display); font-size: 22px; font-weight: 600; }
+
+.empty { padding: 22px 16px; text-align: center; color: var(--muted); }
+
+/* формы */
+label.f { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+input[type=text], input[type=tel], input[type=number], input[type=date], input[type=time], select, textarea {
+  width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-weight: 500;
+}
+textarea { min-height: 96px; resize: vertical; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid2 > * { min-width: 0; }
+.form { display: flex; flex-direction: column; gap: 14px; }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button { flex: 1; min-width: 52px; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-weight: 700; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600; }
+.switch input { width: 46px; height: 28px; appearance: none; -webkit-appearance: none; border-radius: 999px; background: var(--line); position: relative; flex: none; transition: background .15s; }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
+.switch input:checked { background: var(--accent); }
+.switch input:checked::after { transform: translateX(18px); }
+.summary { background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; font-size: 14px; }
+.summary b { font-variant-numeric: tabular-nums; }
+.hint { color: var(--muted); font-size: 13px; margin: 0; }
+
+/* отметка посещений */
+.check { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; flex: none; transition: all .12s; }
+.check svg { width: 16px; height: 16px; opacity: 0; }
+.row[aria-pressed="true"] .check { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.row[aria-pressed="true"] .check svg { opacity: 1; }
+.stickybar { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 3; }
+
+/* нижнее меню */
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--surface); border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); }
+nav.tabs .in { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); }
+nav.tabs button { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; font-size: 11px; font-weight: 600; color: var(--muted); }
+nav.tabs svg { width: 22px; height: 22px; }
+nav.tabs button[aria-current="page"] { color: var(--accent); }
+
+/* лист снизу */
+.scrim { position: fixed; inset: 0; background: rgba(28,10,22,.45); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--surface); width: 100%; max-width: 560px; max-height: 92%; overflow-y: auto; border-radius: 22px 22px 0 0; padding: 18px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 16px; animation: up .2s ease-out; }
+.sheet h2 { font-family: var(--f-display); font-weight: 600; font-size: 26px; }
+.sheet .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+@keyframes up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } * { transition: none !important; } }
+
+.msg { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; white-space: pre-wrap; user-select: all; -webkit-user-select: all; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-weight: 600; z-index: 30; max-width: calc(100% - 32px); }
+
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.stat { padding: 14px; }
+.stat b { display: block; font-family: var(--f-display); font-size: 30px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--muted); font-size: 13px; }
+.banner { padding: 12px 14px; border-radius: 14px; background: var(--warn-soft); color: var(--warn); font-size: 13px; font-weight: 600; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.search { position: relative; }
+.timeline .row { min-height: 48px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <svg class="ballerina" viewBox="0 0 120 120" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="56" cy="24" r="6.5" fill="currentColor" stroke="none"/>
+      <circle cx="61.5" cy="17.5" r="3" fill="currentColor" stroke="none"/>
+      <path d="M56 31 C55 38 54.5 45 56 52"/>
+      <path d="M55.5 35 C47 31 37 26 26 18"/>
+      <path d="M56.5 35 C66 33 76 34 88 30"/>
+      <path d="M30 55 C40 49 72 49 84 55 C76 58 70 56 64 59 C59 56 53 59 48 57 C42 59 36 56 30 55 Z" fill="var(--accent-soft)" stroke-width="2.5"/>
+      <path d="M57 57 L58 82 L59 106"/>
+      <path d="M59 106 L62 107"/>
+      <path d="M60 57 C72 60 88 60 108 54"/>
+    </svg>
+    <div class="brand">
+      <h1>Ballet Forever</h1>
+      <p id="subtitle">абонементы и посещения</p>
+    </div>
+    <button class="iconbtn" id="settingsBtn" aria-label="Настройки">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+  <main id="app"></main>
+</div>
+
+<nav class="tabs" aria-label="Разделы">
+  <div class="in">
+    <button data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Главная</button>
+    <button data-tab="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18M8.5 15.5l2.5 2.5 4.5-5"/></svg>Занятие</button>
+    <button data-tab="students"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/><path d="M16 4a4 4 0 0 1 0 8M19 14.8c1.8.9 3 2.9 3 6.2"/></svg>Ученицы</button>
+    <button data-tab="money"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 10v5M18 10v5"/></svg>Деньги</button>
+  </div>
+</nav>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- даты ---------- */
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const today = () => iso(new Date());
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
+const diff = (a, b) => Math.round((parse(b) - parse(a)) / 86400000); // b - a в днях
+const MONTHS = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const MONTHS_NOM = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const DOW = ['вс','пн','вт','ср','чт','пт','сб'];
+const DOW_FULL = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+const fmt = s => { const d = parse(s); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+const fmtDow = s => `${DOW[parse(s).getDay()]}, ${fmt(s)}`;
+const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? b : c; };
+const zan = n => `${n} ${plural(n, 'занятие', 'занятия', 'занятий')}`;
+const rub = n => `${Number(n).toLocaleString('ru-RU')} ₽`;
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const initials = name => name.trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
+
+/* ---------- данные ---------- */
+const KEY = 'ballet-forever-v1';
+const REASONS = { sick: 'Болезнь (больничный)', trip: 'Командировка', vacation: 'Отпуск', other: 'Другое уважительное' };
+const DEFAULT_TEMPLATE = '{имя}, привет! В твоём абонементе осталось {осталось}, он действует до {до}. Если хочешь продолжать, продлим на следующем занятии. Ballet Forever';
+
+function defaults() {
+  return {
+    settings: {
+      pricePerLesson: 500,
+      priceSingle: 1000,
+      soonLessons: 2,
+      soonDays: 5,
+      template: DEFAULT_TEMPLATE,
+      lastBackup: null,
+    },
+    schedule: [
+      { id: 'c1', dow: 1, title: 'Растяжка', start: '18:00', end: '19:00' },
+      { id: 'c2', dow: 2, title: 'Балет', start: '19:00', end: '20:30' },
+      { id: 'c3', dow: 4, title: 'Балет', start: '19:00', end: '20:30' },
+      { id: 'c4', dow: 0, title: 'Балет + силовая', start: '13:00', end: '14:30' },
+    ],
+    students: [], passes: [], visits: [],
+  };
+}
+
+function sample() {
+  const db = defaults();
+  const t = today();
+  const mk = (name, phone, remind) => { const s = { id: uid(), name, phone, remind, note: '', example: true }; db.students.push(s); return s; };
+  const pass = (s, perWeek, weeks, startOffset, extra = {}) => {
+    const p = { id: uid(), studentId: s.id, perWeek, weeks, total: perWeek * weeks, price: perWeek * weeks * 500, paidAt: addDays(t, startOffset), start: addDays(t, startOffset), freezes: [], ...extra };
+    db.passes.push(p); return p;
+  };
+  // занятия, которые были в прошлом по расписанию, от start до вчера
+  const pastClassDays = (from) => { const out = []; for (let d = from; d < t; d = addDays(d, 1)) { const c = db.schedule.find(c => c.dow === parse(d).getDay()); if (c) out.push({ date: d, classId: c.id }); } return out; };
+  const attend = (s, p, take, keep = 0) => { pastClassDays(p.start).filter(take).slice(0, p.total - keep).forEach(x => db.visits.push({ id: uid(), studentId: s.id, date: x.date, classId: x.classId, kind: 'pass', passId: p.id })); };
+
+  const a = mk('Алина Морозова', '+7 900 111-22-33', true);
+  const pa = pass(a, 3, 4, -24); attend(a, pa, () => true, 1);
+  const b = mk('Вера Соколова', '+7 900 222-33-44', true);
+  const pb = pass(b, 2, 4, -10); attend(b, pb, x => [2, 4].includes(parse(x.date).getDay()));
+  const c = mk('Дарья Лебедева', '+7 900 333-44-55', true);
+  const pc = pass(c, 4, 4, -26, { freezes: [{ id: uid(), from: addDays(t, -12), to: addDays(t, -6), reason: 'trip' }] });
+  attend(c, pc, x => diff(x.date, addDays(t, -12)) > 0 || diff(addDays(t, -6), x.date) > 0);
+  const d = mk('Ольга Павлова', '+7 900 444-55-66', false);
+  pastClassDays(addDays(t, -14)).filter(x => parse(x.date).getDay() === 4).forEach(x => db.visits.push({ id: uid(), studentId: d.id, date: x.date, classId: x.classId, kind: 'single', price: 1000 }));
+  const e = mk('Ксения Белова', '+7 900 555-66-77', true);
+  const pe = pass(e, 3, 4, -3); attend(e, pe, () => true);
+  const f = mk('Марина Орлова', '+7 900 666-77-88', true);
+  const pf = pass(f, 2, 4, -35); attend(f, pf, x => [2, 0].includes(parse(x.date).getDay()) && diff(x.date, addDays(t, -22)) > 0);
+  return db;
+}
+
+let db;
+let storageOk = true;
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) { db = JSON.parse(raw); db.settings = { ...defaults().settings, ...db.settings }; return; }
+  } catch (e) { storageOk = false; }
+  db = sample();
+  save();
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { storageOk = false; }
+}
+
+/* ---------- расчёты по абонементу ---------- */
+const frozenDays = p => p.freezes.reduce((s, f) => s + Math.max(0, diff(f.from, f.to) + 1), 0);
+const passEnd = p => addDays(p.start, p.weeks * 7 - 1 + frozenDays(p));
+const passUsed = p => db.visits.filter(v => v.passId === p.id).length;
+const passLeft = p => p.total - passUsed(p);
+const isFrozenOn = (p, d) => p.freezes.some(f => d >= f.from && d <= f.to);
+
+function passState(p, on = today()) {
+  const left = passLeft(p), end = passEnd(p), daysLeft = diff(on, end);
+  if (on < p.start) return { key: 'future', left, end, daysLeft, label: `с ${fmt(p.start)}`, tone: 'mute' };
+  if (left <= 0) return { key: 'used', left: 0, end, daysLeft, label: 'занятия закончились', tone: 'bad' };
+  if (on > end) return { key: 'expired', left, end, daysLeft, burned: left, label: `истёк, сгорело ${left}`, tone: 'bad' };
+  if (isFrozenOn(p, on)) return { key: 'frozen', left, end, daysLeft, label: 'заморожен', tone: 'mute' };
+  const soon = left <= db.settings.soonLessons || daysLeft <= db.settings.soonDays;
+  return { key: soon ? 'soon' : 'active', left, end, daysLeft, label: `осталось ${left} из ${p.total}`, tone: soon ? 'warn' : 'ok' };
+}
+const studentPasses = sid => db.passes.filter(p => p.studentId === sid).sort((a, b) => a.start < b.start ? 1 : -1);
+function currentPass(sid, on = today()) {
+  const list = studentPasses(sid);
+  // сначала действующий на эту дату, иначе самый свежий
+  return list.find(p => { const s = passState(p, on); return ['active', 'soon', 'frozen'].includes(s.key); }) || list.find(p => passState(p, on).key === 'future') || list[0] || null;
+}
+function passForVisit(sid, date, exceptVisitIds = []) {
+  return db.passes.filter(p => p.studentId === sid && date >= p.start && date <= passEnd(p))
+    .sort((a, b) => a.start < b.start ? -1 : 1)
+    .find(p => p.total - db.visits.filter(v => v.passId === p.id && !exceptVisitIds.includes(v.id)).length > 0) || null;
+}
+const studentById = id => db.students.find(s => s.id === id);
+const classById = id => db.schedule.find(c => c.id === id);
+
+function upcomingClass() {
+  const now = new Date();
+  for (let i = 0; i < 8; i++) {
+    const d = addDays(today(), i), dow = parse(d).getDay();
+    const list = db.schedule.filter(c => c.dow === dow).sort((a, b) => a.start < b.start ? -1 : 1);
+    for (const c of list) {
+      if (i === 0) { const [h, m] = c.end.split(':').map(Number); if (now.getHours() * 60 + now.getMinutes() > h * 60 + m) continue; }
+      return { date: d, cls: c };
+    }
+  }
+  return null;
+}
+
+function reminderText(s, p) {
+  const st = passState(p);
+  return db.settings.template
+    .replaceAll('{имя}', s.name.split(' ')[0])
+    .replaceAll('{осталось}', zan(st.left))
+    .replaceAll('{до}', fmt(st.end));
+}
+
+/* ---------- интерфейс ---------- */
+const app = document.getElementById('app');
+let tab = 'home';
+let markState = null;
+let studentFilter = '';
+
+const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const meter = (p, st) => p.total > 24 ? '' : `<div class="meter" aria-hidden="true">${Array.from({ length: p.total }, (_, i) => `<i class="${i < st.left && ['active', 'soon', 'frozen', 'future'].includes(st.key) ? 'on' : ''}"></i>`).join('')}</div>`;
+const exPill = s => s.example ? ' <span class="pill ex">пример</span>' : '';
+
+function toast(text) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = text; t.setAttribute('role', 'status');
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
+}
+
+function setTab(t) { tab = t; if (t !== 'mark') markState = null; render(); window.scrollTo(0, 0); }
+document.querySelectorAll('nav.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+document.getElementById('settingsBtn').addEventListener('click', () => { tab = 'settings'; render(); window.scrollTo(0, 0); });
+
+function render() {
+  document.querySelectorAll('nav.tabs button').forEach(b => { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  ({ home: renderHome, mark: renderMark, students: renderStudents, money: renderMoney, settings: renderSettings })[tab]();
+}
+
+/* ----- Главная ----- */
+function renderHome() {
+  const t = today();
+  const soon = [], ended = [];
+  db.students.forEach(s => {
+    const p = currentPass(s.id); if (!p) return;
+    const st = passState(p);
+    const newer = db.passes.some(q => q.studentId === s.id && q.start > p.start);
+    if (newer) return;
+    if (st.key === 'soon') soon.push({ s, p, st });
+    if ((st.key === 'used' || st.key === 'expired') && diff(st.end, t) <= 21) ended.push({ s, p, st });
+  });
+  soon.sort((a, b) => a.st.left - b.st.left || a.st.daysLeft - b.st.daysLeft);
+  const up = upcomingClass();
+  const hasExamples = db.students.some(s => s.example);
+  const backupDays = db.settings.lastBackup ? diff(db.settings.lastBackup, t) : null;
+
+  app.innerHTML = `<div class="screen">
+    ${hasExamples ? `<div class="banner"><span>Сейчас здесь выдуманные ученицы для примера.</span><button class="btn small" data-act="clear-examples">Убрать примеры</button></div>` : ''}
+    ${!storageOk ? `<div class="banner"><span>Браузер не даёт сохранять данные. Откройте приложение в обычном окне, не в режиме инкогнито.</span></div>` : ''}
+    ${!hasExamples && db.students.length && (backupDays === null || backupDays >= 14) ? `<div class="banner"><span>${backupDays === null ? 'Резервной копии ещё нет.' : `Последняя копия ${backupDays} дн. назад.`} Сохраните копию данных.</span><button class="btn small" data-act="go-settings">Сохранить</button></div>` : ''}
+
+    ${up ? `<div class="card next">
+      <div class="when"><b class="num">${up.cls.start}</b><small>${up.date === t ? 'сегодня' : diff(t, up.date) === 1 ? 'завтра' : DOW_FULL[parse(up.date).getDay()]}</small></div>
+      <div class="main"><div class="eyebrow">Ближайшее занятие</div><h3>${esc(up.cls.title)}</h3><div class="sub" style="color:var(--muted);font-size:13px">${fmtDow(up.date)}, до ${up.cls.end}</div></div>
+      <button class="btn primary small" data-act="mark-class" data-date="${up.date}" data-class="${up.cls.id}">Отметить</button>
+    </div>` : ''}
+
+    <section>
+      <div class="sec-title"><h2>Скоро закончится</h2><span>${soon.length ? soon.length : ''}</span></div>
+      <div class="card list" style="margin-top:10px">
+        ${soon.length ? soon.map(({ s, p, st }) => `<div class="row">
+          <div class="avatar">${esc(initials(s.name))}</div>
+          <div class="main"><div class="name">${esc(s.name)}${exPill(s)}</div>
+            <div class="sub num">осталось ${st.left} из ${p.total} · до ${fmt(st.end)}</div>${meter(p, st)}</div>
+          <div class="btns" style="flex-direction:column;align-items:stretch">
+            ${s.remind ? `<button class="btn small" data-act="remind" data-id="${s.id}">Напомнить</button>` : ''}
+            <button class="btn small primary" data-act="renew" data-id="${s.id}">Продлить</button>
+          </div></div>`).join('') : `<div class="empty">Ни у кого абонемент не кончается в ближайшие ${db.settings.soonDays} дн.</div>`}
+      </div>
+    </section>
+
+    ${ended.length ? `<section>
+      <div class="sec-title"><h2>Закончился</h2><span>за 3 недели</span></div>
+      <div class="card list" style="margin-top:10px">
+        ${ended.map(({ s, p, st }) => `<div class="row">
+          <div class="avatar">${esc(initials(s.name))}</div>
+          <div class="main"><div class="name">${esc(s.name)}${exPill(s)}</div>
+            <div class="sub">${st.key === 'expired' ? `срок вышел ${fmt(st.end)}, сгорело ${zan(st.burned)}` : `все ${zan(p.total)} использованы`}</div></div>
+          <button class="btn small primary" data-act="renew" data-id="${s.id}">Продлить</button></div>`).join('')}
+      </div></section>` : ''}
+
+    <div class="btns">
+      <button class="btn primary" style="flex:1" data-act="new-pass">+ Оплата абонемента</button>
+      <button class="btn" style="flex:1" data-act="new-student">+ Ученица</button>
+    </div>
+  </div>`;
+}
+
+/* ----- Отметка занятия ----- */
+function classesFor(date) { return db.schedule.filter(c => c.dow === parse(date).getDay()).sort((a, b) => a.start < b.start ? -1 : 1); }
+function openMark(date, classId) {
+  const existing = db.visits.filter(v => v.date === date && v.classId === classId);
+  markState = { date, classId, picked: new Map(existing.map(v => [v.studentId, { kind: v.kind, id: v.id }])), extra: [] };
+  tab = 'mark'; render();
+}
+function renderMark() {
+  if (!markState) {
+    const up = upcomingClass();
+    const t = today(), todays = classesFor(t);
+    const start = todays.length ? { date: t, cls: todays[0] } : up;
+    if (start) { openMark(start.date, start.cls.id); return; }
+    markState = { date: t, classId: '', picked: new Map(), extra: [] };
+  }
+  const { date, classId, picked } = markState;
+  const opts = classesFor(date);
+  const ids = new Set(db.visits.filter(v => v.date === date && v.classId === classId).map(v => v.id));
+  const rows = db.students.map(s => {
+    const p = passForVisit(s.id, date, [...ids]);
+    return { s, p, st: p ? passState(p, date) : null };
+  }).sort((a, b) => (!!b.p - !!a.p) || a.s.name.localeCompare(b.s.name, 'ru'));
+  const withPass = rows.filter(r => r.p), noPass = rows.filter(r => !r.p);
+  const count = picked.size;
+
+  const rowHtml = ({ s, p, st }) => {
+    const on = picked.has(s.id);
+    const frozen = p && isFrozenOn(p, date);
+    let sub = p ? `абонемент: осталось ${st.left}${frozen ? ' · заморожен на эту дату' : ''}` : `разово, ${rub(db.settings.priceSingle)}`;
+    if (on && picked.get(s.id).kind === 'single' && p) sub = 'отмечена как разовое';
+    return `<button class="row" data-act="toggle" data-id="${s.id}" aria-pressed="${on}">
+      <div class="check">${ICON_CHECK}</div>
+      <div class="main"><div class="name">${esc(s.name)}${exPill(s)}</div><div class="sub num">${sub}</div></div>
+      ${p ? `<span class="pill ${st.tone}">${st.left}</span>` : '<span class="pill mute">разово</span>'}
+    </button>`;
+  };
+
+  app.innerHTML = `<div class="screen">
+    <div class="sec-title"><h2>Кто пришёл</h2><span class="num">${count ? `отмечено ${count}` : ''}</span></div>
+    <div class="grid2">
+      <label class="f">Дата<input type="date" id="mDate" value="${date}"></label>
+      <label class="f">Занятие<select id="mClass">
+        ${opts.map(c => `<option value="${c.id}" ${c.id === classId ? 'selected' : ''}>${esc(c.title)}, ${c.start}</option>`).join('')}
+        ${opts.length ? '' : '<option value="">В этот день занятий нет</option>'}
+      </select></label>
+    </div>
+    ${classId ? `
+      <div class="card list">${withPass.length ? withPass.map(rowHtml).join('') : '<div class="empty">На эту дату ни у кого нет действующего абонемента.</div>'}</div>
+      ${noPass.length ? `<div><div class="eyebrow" style="margin-bottom:8px">Без абонемента, оплата разово</div><div class="card list">${noPass.map(rowHtml).join('')}</div></div>` : ''}
+      <button class="btn ghost" data-act="new-student-mark">+ Новая ученица</button>
+      <div class="stickybar"><button class="btn primary block" data-act="save-mark">Сохранить${count ? ` (${count})` : ''}</button></div>
+    ` : `<p class="hint">Выберите другую дату или добавьте занятие в расписание в настройках.</p>`}
+  </div>`;
+
+  document.getElementById('mDate').addEventListener('change', e => {
+    const d = e.target.value || today(); const c = classesFor(d)[0];
+    if (c) openMark(d, c.id); else { markState = { date: d, classId: '', picked: new Map(), extra: [] }; render(); }
+  });
+  document.getElementById('mClass').addEventListener('change', e => openMark(markState.date, e.target.value));
+}
+function toggleMark(sid) {
+  const { date, classId, picked } = markState;
+  if (picked.has(sid)) picked.delete(sid);
+  else {
+    const ids = db.visits.filter(v => v.date === date && v.classId === classId).map(v => v.id);
+    // сколько уже отмечено этой ученице в текущем выборе по тому же абонементу
+    const p = passForVisit(sid, date, ids);
+    picked.set(sid, { kind: p ? 'pass' : 'single' });
+  }
+  render();
+}
+function saveMark() {
+  const { date, classId, picked } = markState;
+  const old = db.visits.filter(v => v.date === date && v.classId === classId);
+  const oldIds = old.map(v => v.id);
+  db.visits = db.visits.filter(v => !(v.date === date && v.classId === classId));
+  let singles = 0;
+  picked.forEach((val, sid) => {
+    const prev = old.find(v => v.studentId === sid);
+    const p = val.kind === 'pass' ? passForVisit(sid, date, oldIds) : null;
+    if (p) db.visits.push({ id: prev?.id || uid(), studentId: sid, date, classId, kind: 'pass', passId: p.id });
+    else { singles++; db.visits.push({ id: prev?.id || uid(), studentId: sid, date, classId, kind: 'single', price: prev?.price ?? db.settings.priceSingle }); }
+  });
+  save();
+  toast(`Сохранено: ${picked.size}${singles ? `, из них разово ${singles}` : ''}`);
+  openMark(date, classId);
+}
+
+/* ----- Ученицы ----- */
+function renderStudents() {
+  const q = studentFilter.trim().toLowerCase();
+  const list = db.students.filter(s => !q || s.name.toLowerCase().includes(q)).map(s => {
+    const p = currentPass(s.id); return { s, p, st: p ? passState(p) : null };
+  }).sort((a, b) => a.s.name.localeCompare(b.s.name, 'ru'));
+  app.innerHTML = `<div class="screen">
+    <div class="sec-title"><h2>Ученицы</h2><span class="num">${db.students.length}</span></div>
+    <input type="text" id="sSearch" placeholder="Поиск по имени" value="${esc(studentFilter)}" aria-label="Поиск по имени">
+    <div class="card list">
+      ${list.length ? list.map(({ s, p, st }) => `<button class="row" data-act="open-student" data-id="${s.id}">
+        <div class="avatar">${esc(initials(s.name))}</div>
+        <div class="main"><div class="name">${esc(s.name)}${exPill(s)}</div>
+          <div class="sub num">${p ? `${p.perWeek} р/нед · до ${fmt(st.end)}` : 'разовые занятия'}</div></div>
+        ${p ? `<span class="pill ${st.tone}">${st.key === 'active' || st.key === 'soon' ? `${st.left} из ${p.total}` : st.label}</span>` : '<span class="pill mute">разово</span>'}
+      </button>`).join('') : '<div class="empty">Пока никого. Добавьте первую ученицу кнопкой ниже.</div>'}
+    </div>
+    <button class="btn primary" data-act="new-student">+ Ученица</button>
+  </div>`;
+  const inp = document.getElementById('sSearch');
+  inp.addEventListener('input', e => { studentFilter = e.target.value; const pos = e.target.selectionStart; render(); const n = document.getElementById('sSearch'); n.focus(); n.setSelectionRange(pos, pos); });
+}
+
+/* ----- Деньги ----- */
+let moneyMonth = today().slice(0, 7);
+function renderMoney() {
+  const [y, m] = moneyMonth.split('-').map(Number);
+  const inMonth = d => d && d.slice(0, 7) === moneyMonth;
+  const passes = db.passes.filter(p => inMonth(p.paidAt));
+  const singles = db.visits.filter(v => v.kind === 'single' && inMonth(v.date));
+  const visits = db.visits.filter(v => inMonth(v.date));
+  const passSum = passes.reduce((s, p) => s + Number(p.price || 0), 0);
+  const singleSum = singles.reduce((s, v) => s + Number(v.price || 0), 0);
+  const burned = db.passes.map(p => ({ p, st: passState(p) })).filter(x => x.st.key === 'expired' && inMonth(x.st.end));
+  const burnedCount = burned.reduce((s, x) => s + x.st.burned, 0);
+  const prev = () => { const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+  const next = () => { const d = new Date(y, m, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+  const ops = [
+    ...passes.map(p => ({ date: p.paidAt, text: `${studentById(p.studentId)?.name || '—'}`, sub: `абонемент ${p.perWeek} р/нед, ${zan(p.total)}`, sum: p.price })),
+    ...singles.map(v => ({ date: v.date, text: `${studentById(v.studentId)?.name || '—'}`, sub: `разовое · ${classById(v.classId)?.title || ''}`, sum: v.price })),
+  ].sort((a, b) => a.date < b.date ? 1 : -1);
+
+  app.innerHTML = `<div class="screen">
+    <div class="sec-title"><h2>${MONTHS_NOM[m - 1]} ${y}</h2>
+      <span class="btns"><button class="btn small" data-act="month" data-m="${prev()}" aria-label="Предыдущий месяц">‹</button><button class="btn small" data-act="month" data-m="${next()}" aria-label="Следующий месяц">›</button></span></div>
+    <div class="stats">
+      <div class="card stat"><b>${rub(passSum + singleSum)}</b><span>всего получено</span></div>
+      <div class="card stat"><b class="num">${visits.length}</b><span>посещений</span></div>
+      <div class="card stat"><b>${rub(passSum)}</b><span>абонементы (${passes.length})</span></div>
+      <div class="card stat"><b>${rub(singleSum)}</b><span>разовые (${singles.length})</span></div>
+    </div>
+    <div class="card stat"><b class="num">${burnedCount}</b><span>${plural(burnedCount, 'занятие сгорело', 'занятия сгорело', 'занятий сгорело')} у абонементов, истёкших в этом месяце</span></div>
+    <section><div class="sec-title"><h2>Оплаты</h2></div>
+      <div class="card list timeline" style="margin-top:10px">
+        ${ops.length ? ops.map(o => `<div class="row"><div class="main"><div class="name">${esc(o.text)}</div><div class="sub">${fmt(o.date)} · ${esc(o.sub)}</div></div><b class="num">${rub(o.sum)}</b></div>`).join('') : '<div class="empty">В этом месяце оплат нет.</div>'}
+      </div></section>
+  </div>`;
+}
+
+/* ----- Настройки ----- */
+function renderSettings() {
+  const st = db.settings;
+  const sched = [...db.schedule].sort((a, b) => ((a.dow + 6) % 7) - ((b.dow + 6) % 7) || (a.start < b.start ? -1 : 1));
+  app.innerHTML = `<div class="screen">
+    <div class="sec-title"><h2>Настройки</h2><button class="btn small" data-act="tab-home">Готово</button></div>
+    <section class="card form" style="padding:16px">
+      <div class="eyebrow">Цены</div>
+      <div class="grid2">
+        <label class="f">Занятие в абонементе, ₽<input type="number" inputmode="numeric" id="stLesson" value="${st.pricePerLesson}" min="0"></label>
+        <label class="f">Разовое занятие, ₽<input type="number" inputmode="numeric" id="stSingle" value="${st.priceSingle}" min="0"></label>
+      </div>
+      <div class="eyebrow">Когда предупреждать</div>
+      <div class="grid2">
+        <label class="f">Осталось занятий не больше<input type="number" inputmode="numeric" id="stSoonL" value="${st.soonLessons}" min="0"></label>
+        <label class="f">Или до конца дней не больше<input type="number" inputmode="numeric" id="stSoonD" value="${st.soonDays}" min="0"></label>
+      </div>
+      <label class="f">Текст напоминания
+        <textarea id="stTpl">${esc(st.template)}</textarea></label>
+      <p class="hint">Подставляется: {имя}, {осталось}, {до}.</p>
+      <button class="btn primary" data-act="save-settings">Сохранить</button>
+    </section>
+
+    <section>
+      <div class="sec-title"><h2>Расписание</h2></div>
+      <div class="card list" style="margin-top:10px">
+        ${sched.map(c => `<button class="row" data-act="edit-class" data-id="${c.id}"><div class="avatar" style="font-size:12px">${DOW[c.dow]}</div>
+          <div class="main"><div class="name">${esc(c.title)}</div><div class="sub num">${DOW_FULL[c.dow]}, ${c.start}–${c.end}</div></div></button>`).join('')}
+      </div>
+      <button class="btn ghost" style="margin-top:8px" data-act="edit-class" data-id="">+ Добавить занятие</button>
+    </section>
+
+    <section class="card form" style="padding:16px">
+      <div class="eyebrow">Резервная копия</div>
+      <p class="hint">Все данные хранятся только в этом телефоне. Раз в пару недель сохраняйте копию в файл и отправляйте себе, например, в «Избранное» в Максе. Если телефон сменится, копию можно загрузить обратно.</p>
+      <div class="btns">
+        <button class="btn primary" data-act="export">Сохранить копию в файл</button>
+        <button class="btn" data-act="copy-backup">Скопировать как текст</button>
+      </div>
+      <label class="btn" style="cursor:pointer">Загрузить копию из файла<input type="file" id="importFile" accept=".json,application/json,text/plain" hidden></label>
+      ${st.lastBackup ? `<p class="hint">Последняя копия: ${fmt(st.lastBackup)}.</p>` : ''}
+    </section>
+
+    <section class="card form" style="padding:16px">
+      <div class="eyebrow">Начать заново</div>
+      <div class="btns">
+        ${db.students.some(s => s.example) ? '<button class="btn" data-act="clear-examples">Убрать примеры</button>' : ''}
+        <button class="btn danger" data-act="wipe">Стереть все данные</button>
+      </div>
+    </section>
+  </div>`;
+  document.getElementById('importFile').addEventListener('change', e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => importText(String(r.result));
+    r.readAsText(f);
+  });
+}
+function importText(text) {
+  try {
+    const data = JSON.parse(text);
+    if (!Array.isArray(data.students) || !Array.isArray(data.passes) || !Array.isArray(data.visits)) throw new Error();
+    confirmSheet('Загрузить копию?', `В копии ${data.students.length} учениц, ${data.passes.length} абонементов. Текущие данные заменятся.`, 'Загрузить', () => {
+      db = { ...defaults(), ...data, settings: { ...defaults().settings, ...data.settings } }; save(); toast('Копия загружена'); tab = 'home'; render();
+    });
+  } catch (e) { toast('Это не похоже на файл копии Ballet Forever'); }
+}
+
+/* ---------- листы ---------- */
+function sheet(html, onMount) {
+  closeSheet();
+  const scrim = document.createElement('div'); scrim.className = 'scrim'; scrim.id = 'scrim';
+  scrim.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+  scrim.addEventListener('click', e => { if (e.target === scrim) closeSheet(); });
+  document.body.appendChild(scrim);
+  document.body.style.overflow = 'hidden';
+  scrim.querySelector('.sheet').addEventListener('click', onAction);
+  onMount && onMount(scrim.querySelector('.sheet'));
+  const first = scrim.querySelector('input, select, textarea, button'); first && first.focus({ preventScroll: true });
+}
+function closeSheet() { const s = document.getElementById('scrim'); if (s) s.remove(); document.body.style.overflow = ''; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+const sheetHead = title => `<div class="head"><h2>${title}</h2><button class="iconbtn" data-act="close" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
+
+let confirmCb = null;
+function confirmSheet(title, text, okLabel, cb) {
+  confirmCb = cb;
+  sheet(`${sheetHead(title)}<p style="margin:0">${esc(text)}</p><div class="btns"><button class="btn primary" style="flex:1" data-act="confirm-ok">${esc(okLabel)}</button><button class="btn" style="flex:1" data-act="close">Отмена</button></div>`);
+}
+
+function studentSheet(id, afterSave) {
+  const s = id ? studentById(id) : { name: '', phone: '', remind: true, note: '' };
+  sheet(`${sheetHead(id ? 'Изменить' : 'Новая ученица')}
+    <form class="form" id="stForm">
+      <label class="f">Имя и фамилия<input type="text" id="fName" value="${esc(s.name)}" required autocomplete="off"></label>
+      <label class="f">Телефон<input type="tel" id="fPhone" value="${esc(s.phone)}" placeholder="+7"></label>
+      <label class="switch">Напоминать о конце абонемента<input type="checkbox" id="fRemind" ${s.remind ? 'checked' : ''}></label>
+      <label class="f">Заметка<input type="text" id="fNote" value="${esc(s.note)}" placeholder="например, ходит по вт и чт"></label>
+      <button class="btn primary" type="submit">Сохранить</button>
+      ${id ? '<button class="btn danger" type="button" data-act="delete-student" data-id="' + id + '">Удалить ученицу</button>' : ''}
+    </form>`, el => {
+    el.querySelector('#stForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const name = el.querySelector('#fName').value.trim(); if (!name) return;
+      const data = { name, phone: el.querySelector('#fPhone').value.trim(), remind: el.querySelector('#fRemind').checked, note: el.querySelector('#fNote').value.trim() };
+      let sid = id;
+      if (id) Object.assign(studentById(id), data); else { sid = uid(); db.students.push({ id: sid, ...data }); }
+      save(); closeSheet(); toast('Сохранено');
+      afterSave ? afterSave(sid) : render();
+    });
+  });
+}
+
+function passSheet(studentId, prefill = {}) {
+  const t = today();
+  const st = db.settings;
+  let perWeek = prefill.perWeek || 3, weeks = prefill.weeks || 4, priceTouched = false;
+  const prevPass = studentId ? studentPasses(studentId)[0] : null;
+  let start = prefill.start || t;
+  if (!prefill.start && prevPass) { const ps = passState(prevPass); if (['active', 'soon', 'frozen'].includes(ps.key)) start = addDays(ps.end, 1); }
+  const students = [...db.students].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  sheet(`${sheetHead('Оплата абонемента')}
+    <form class="form" id="pForm">
+      <label class="f">Ученица<select id="pStudent" required>
+        <option value="">Выберите</option>
+        ${students.map(s => `<option value="${s.id}" ${s.id === studentId ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}
+      </select></label>
+      <div class="f" style="font-size:13px;font-weight:600;color:var(--muted)">Раз в неделю
+        <div class="seg" id="pPer">${[1, 2, 3, 4].map(n => `<button type="button" data-n="${n}" aria-pressed="${n === perWeek}">${n}</button>`).join('')}</div></div>
+      <div class="grid2">
+        <label class="f">Недель<input type="number" inputmode="numeric" id="pWeeks" value="${weeks}" min="1" max="12"></label>
+        <label class="f">Начало<input type="date" id="pStart" value="${start}"></label>
+      </div>
+      <div class="grid2">
+        <label class="f">Сумма, ₽<input type="number" inputmode="numeric" id="pPrice" min="0"></label>
+        <label class="f">Дата оплаты<input type="date" id="pPaid" value="${t}"></label>
+      </div>
+      <div class="summary" id="pSum"></div>
+      <button class="btn primary" type="submit">Записать оплату</button>
+    </form>`, el => {
+    const $ = q => el.querySelector(q);
+    const upd = () => {
+      weeks = Math.max(1, Number($('#pWeeks').value) || 1);
+      const total = perWeek * weeks;
+      if (!priceTouched) $('#pPrice').value = total * st.pricePerLesson;
+      const s = $('#pStart').value || t;
+      $('#pSum').innerHTML = `<b>${zan(total)}</b> за ${weeks} ${plural(weeks, 'неделю', 'недели', 'недель')}, действует <b>с ${fmt(s)} по ${fmt(addDays(s, weeks * 7 - 1))}</b>. Что не использовано к концу срока, сгорает.`;
+    };
+    $('#pPer').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; perWeek = Number(b.dataset.n); $('#pPer').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); upd(); });
+    $('#pWeeks').addEventListener('input', upd); $('#pStart').addEventListener('change', upd);
+    $('#pPrice').addEventListener('input', () => { priceTouched = true; });
+    upd();
+    $('#pForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const sid = $('#pStudent').value; if (!sid) { $('#pStudent').focus(); return; }
+      const s = $('#pStart').value || t;
+      db.passes.push({ id: uid(), studentId: sid, perWeek, weeks, total: perWeek * weeks, price: Number($('#pPrice').value) || 0, paidAt: $('#pPaid').value || t, start: s, freezes: [] });
+      save(); closeSheet(); toast('Оплата записана'); render();
+    });
+  });
+}
+
+function freezeSheet(passId) {
+  const p = db.passes.find(x => x.id === passId);
+  const t = today();
+  sheet(`${sheetHead('Заморозка')}
+    <p class="hint">Пропуск по уважительной причине. Срок абонемента сдвинется на эти дни, занятия не сгорят.</p>
+    <form class="form" id="fzForm">
+      <label class="f">Причина<select id="fzReason">${Object.entries(REASONS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
+      <div class="grid2">
+        <label class="f">С<input type="date" id="fzFrom" value="${t}"></label>
+        <label class="f">По<input type="date" id="fzTo" value="${addDays(t, 6)}"></label>
+      </div>
+      <div class="summary" id="fzSum"></div>
+      <button class="btn primary" type="submit">Заморозить</button>
+    </form>`, el => {
+    const $ = q => el.querySelector(q);
+    const upd = () => {
+      const from = $('#fzFrom').value, to = $('#fzTo').value;
+      if (!from || !to || to < from) { $('#fzSum').textContent = 'Дата «по» должна быть не раньше даты «с».'; return; }
+      const days = diff(from, to) + 1;
+      $('#fzSum').innerHTML = `${days} ${plural(days, 'день', 'дня', 'дней')}. Абонемент будет действовать до <b>${fmt(addDays(passEnd(p), days))}</b> вместо ${fmt(passEnd(p))}.`;
+    };
+    $('#fzFrom').addEventListener('change', upd); $('#fzTo').addEventListener('change', upd); upd();
+    $('#fzForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const from = $('#fzFrom').value, to = $('#fzTo').value;
+      if (!from || !to || to < from) return;
+      p.freezes.push({ id: uid(), from, to, reason: $('#fzReason').value });
+      save(); closeSheet(); toast('Абонемент заморожен'); studentCard(p.studentId);
+    });
+  });
+}
+
+function remindSheet(sid) {
+  const s = studentById(sid), p = currentPass(sid);
+  const text = reminderText(s, p);
+  const canShare = typeof navigator.share === 'function';
+  sheet(`${sheetHead('Напоминание')}
+    <p class="hint">Для ${esc(s.name)}${s.phone ? `, ${esc(s.phone)}` : ''}. Скопируйте текст и отправьте в Макс.</p>
+    <div class="msg" id="rText">${esc(text)}</div>
+    <div class="btns">
+      ${canShare ? '<button class="btn primary" style="flex:1" data-act="share">Отправить…</button>' : ''}
+      <button class="btn ${canShare ? '' : 'primary'}" style="flex:1" data-act="copy-text">Скопировать</button>
+    </div>
+    <p class="hint">«Отправить…» открывает список приложений телефона, там выберите Макс и нужный чат.</p>`);
+  sheetText = text;
+}
+let sheetText = '';
+
+function studentCard(sid) {
+  const s = studentById(sid);
+  const passes = studentPasses(sid);
+  const cur = currentPass(sid);
+  const st = cur ? passState(cur) : null;
+  const visits = db.visits.filter(v => v.studentId === sid).sort((a, b) => a.date < b.date ? 1 : -1);
+  sheet(`<div class="head"><div style="display:flex;gap:12px;align-items:center;min-width:0"><div class="avatar">${esc(initials(s.name))}</div><div style="min-width:0"><h2 style="font-size:24px;overflow-wrap:anywhere">${esc(s.name)}</h2><div class="hint">${esc(s.phone || 'телефон не указан')}${s.remind ? '' : ' · без напоминаний'}</div></div></div>
+      <button class="iconbtn" data-act="close" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    ${s.note ? `<p class="hint">${esc(s.note)}</p>` : ''}
+    ${cur ? `<div class="card" style="padding:14px;box-shadow:none">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><div class="eyebrow">Текущий абонемент</div><span class="pill ${st.tone}">${st.label}</span></div>
+      <div style="margin-top:6px;font-weight:600" class="num">${cur.perWeek} раза в неделю · ${zan(cur.total)} · ${rub(cur.price)}</div>
+      <div class="hint num">с ${fmt(cur.start)} по ${fmt(st.end)}${cur.freezes.length ? `, продлён на ${frozenDays(cur)} дн.` : ''}</div>
+      ${meter(cur, st)}
+      ${cur.freezes.length ? `<div style="margin-top:10px;display:flex;flex-direction:column;gap:4px">${cur.freezes.map(f => `<div class="hint" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${REASONS[f.reason] || 'Заморозка'}: ${fmt(f.from)} – ${fmt(f.to)}</span><button class="btn small ghost danger" data-act="del-freeze" data-pass="${cur.id}" data-id="${f.id}">убрать</button></div>`).join('')}</div>` : ''}
+      <div class="btns" style="margin-top:12px">
+        ${['active', 'soon', 'frozen', 'future'].includes(st.key) ? `<button class="btn small" data-act="freeze" data-id="${cur.id}">Заморозить</button>` : ''}
+        ${s.remind && ['active', 'soon'].includes(st.key) ? `<button class="btn small" data-act="remind" data-id="${sid}">Напомнить</button>` : ''}
+      </div>
+    </div>` : '<p class="hint">Абонементов нет, ходит разово.</p>'}
+    <div class="btns">
+      <button class="btn primary" style="flex:1" data-act="renew" data-id="${sid}">${cur ? 'Продлить' : 'Купить абонемент'}</button>
+      <button class="btn" style="flex:1" data-act="edit-student" data-id="${sid}">Изменить</button>
+    </div>
+    ${passes.length > 1 ? `<div><div class="eyebrow" style="margin-bottom:6px">Все абонементы</div><div class="card list" style="box-shadow:none">${passes.map(p => { const ps = passState(p); return `<div class="row"><div class="main"><div class="name num">${fmt(p.start)} – ${fmt(ps.end)}</div><div class="sub num">${p.perWeek} р/нед · ${zan(p.total)} · ${rub(p.price)}</div></div><span class="pill ${ps.tone}">${ps.key === 'active' || ps.key === 'soon' ? ps.left : ps.label}</span></div>`; }).join('')}</div></div>` : ''}
+    <div><div class="eyebrow" style="margin-bottom:6px">Посещения</div>
+      <div class="card list" style="box-shadow:none">${visits.length ? visits.slice(0, 30).map(v => `<div class="row" style="min-height:44px"><div class="main"><div class="num">${fmtDow(v.date)}</div><div class="sub">${esc(classById(v.classId)?.title || 'занятие')}</div></div><span class="pill ${v.kind === 'single' ? 'mute' : 'ok'}">${v.kind === 'single' ? `разово, ${rub(v.price)}` : 'абонемент'}</span></div>`).join('') : '<div class="empty">Посещений пока нет.</div>'}</div></div>
+    ${passes.length ? `<button class="btn ghost danger" data-act="delete-pass" data-id="${passes[0].id}">Удалить последнюю оплату</button>` : ''}`);
+}
+
+function classSheet(id) {
+  const c = id ? classById(id) : { dow: 1, title: 'Балет', start: '19:00', end: '20:30' };
+  sheet(`${sheetHead(id ? 'Занятие' : 'Новое занятие')}
+    <form class="form" id="cForm">
+      <label class="f">Название<input type="text" id="cTitle" value="${esc(c.title)}" required></label>
+      <label class="f">День недели<select id="cDow">${[1, 2, 3, 4, 5, 6, 0].map(d => `<option value="${d}" ${d === c.dow ? 'selected' : ''}>${DOW_FULL[d]}</option>`).join('')}</select></label>
+      <div class="grid2"><label class="f">Начало<input type="time" id="cStart" value="${c.start}"></label><label class="f">Конец<input type="time" id="cEnd" value="${c.end}"></label></div>
+      <button class="btn primary" type="submit">Сохранить</button>
+      ${id ? `<button class="btn danger" type="button" data-act="delete-class" data-id="${id}">Удалить из расписания</button>` : ''}
+    </form>`, el => {
+    el.querySelector('#cForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const data = { title: el.querySelector('#cTitle').value.trim() || 'Занятие', dow: Number(el.querySelector('#cDow').value), start: el.querySelector('#cStart').value, end: el.querySelector('#cEnd').value };
+      if (id) Object.assign(classById(id), data); else db.schedule.push({ id: uid(), ...data });
+      save(); closeSheet(); render();
+    });
+  });
+}
+
+/* ---------- копирование и резервные копии ---------- */
+async function copy(text, okMsg) {
+  try { await navigator.clipboard.writeText(text); toast(okMsg); return true; }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
+    ta.remove(); toast(ok ? okMsg : 'Не получилось скопировать, выделите текст вручную'); return ok;
+  }
+}
+function backupJson() { return JSON.stringify(db); }
+function markBackup() { db.settings.lastBackup = today(); save(); }
+function exportFile() {
+  const blob = new Blob([backupJson()], { type: 'application/json' });
+  const name = `ballet-forever-${today()}.json`;
+  const file = typeof File === 'function' ? new File([blob], name, { type: 'application/json' }) : null;
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: 'Копия Ballet Forever' }).then(() => { markBackup(); render(); }).catch(() => {});
+    return;
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  markBackup(); render(); toast('Файл копии сохранён');
+}
+
+/* ---------- обработка нажатий ---------- */
+function onAction(e) {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const act = el.dataset.act, id = el.dataset.id;
+  switch (act) {
+    case 'close': closeSheet(); break;
+    case 'confirm-ok': { const cb = confirmCb; closeSheet(); cb && cb(); break; }
+    case 'tab-home': setTab('home'); break;
+    case 'go-settings': tab = 'settings'; render(); break;
+    case 'mark-class': openMark(el.dataset.date, el.dataset.class); window.scrollTo(0, 0); break;
+    case 'toggle': toggleMark(id); break;
+    case 'save-mark': saveMark(); break;
+    case 'new-student': studentSheet(null); break;
+    case 'new-student-mark': studentSheet(null, sid => { if (markState) markState.picked.set(sid, { kind: 'single' }); render(); }); break;
+    case 'edit-student': studentSheet(id, () => studentCard(id)); break;
+    case 'open-student': studentCard(id); break;
+    case 'new-pass': passSheet(null); break;
+    case 'renew': { const p = studentPasses(id)[0]; passSheet(id, p ? { perWeek: p.perWeek, weeks: p.weeks } : {}); break; }
+    case 'freeze': freezeSheet(id); break;
+    case 'del-freeze': { const p = db.passes.find(x => x.id === el.dataset.pass); p.freezes = p.freezes.filter(f => f.id !== id); save(); studentCard(p.studentId); render(); break; }
+    case 'remind': remindSheet(id); break;
+    case 'copy-text': copy(sheetText, 'Текст скопирован'); break;
+    case 'share': navigator.share({ text: sheetText }).catch(() => {}); break;
+    case 'delete-student': { const s = studentById(id); confirmSheet('Удалить ученицу?', `${s.name}, её абонементы и посещения удалятся.`, 'Удалить', () => {
+      db.students = db.students.filter(x => x.id !== id); db.passes = db.passes.filter(p => p.studentId !== id); db.visits = db.visits.filter(v => v.studentId !== id); save(); render(); toast('Удалено'); }); break; }
+    case 'delete-pass': { const p = db.passes.find(x => x.id === id); confirmSheet('Удалить оплату?', `Абонемент с ${fmt(p.start)} на ${zan(p.total)}, ${rub(p.price)}. Посещения по нему станут разовыми.`, 'Удалить', () => {
+      db.visits.forEach(v => { if (v.passId === id) { v.kind = 'single'; v.price = 0; delete v.passId; } }); db.passes = db.passes.filter(x => x.id !== id); save(); render(); studentCard(p.studentId); }); break; }
+    case 'month': moneyMonth = el.dataset.m; render(); break;
+    case 'save-settings': {
+      const n = (q, d) => { const v = Number(document.getElementById(q).value); return Number.isFinite(v) && v >= 0 ? v : d; };
+      Object.assign(db.settings, { pricePerLesson: n('stLesson', 500), priceSingle: n('stSingle', 1000), soonLessons: n('stSoonL', 2), soonDays: n('stSoonD', 5), template: document.getElementById('stTpl').value.trim() || DEFAULT_TEMPLATE });
+      save(); toast('Настройки сохранены'); break;
+    }
+    case 'edit-class': classSheet(id); break;
+    case 'delete-class': confirmSheet('Удалить занятие из расписания?', 'Прошлые отметки посещений сохранятся.', 'Удалить', () => { db.schedule = db.schedule.filter(c => c.id !== id); save(); render(); }); break;
+    case 'export': exportFile(); break;
+    case 'copy-backup': copy(backupJson(), 'Копия скопирована, вставьте её в Избранное').then(ok => { if (ok) { markBackup(); render(); } }); break;
+    case 'clear-examples': confirmSheet('Убрать примеры?', 'Выдуманные ученицы, их абонементы и посещения удалятся. Расписание и цены останутся.', 'Убрать', () => {
+      const ex = new Set(db.students.filter(s => s.example).map(s => s.id));
+      db.students = db.students.filter(s => !ex.has(s.id)); db.passes = db.passes.filter(p => !ex.has(p.studentId)); db.visits = db.visits.filter(v => !ex.has(v.studentId));
+      save(); render(); toast('Примеры убраны'); }); break;
+    case 'wipe': confirmSheet('Стереть всё?', 'Удалятся ученицы, оплаты, посещения и настройки. Отменить нельзя.', 'Стереть', () => { db = defaults(); save(); setTab('home'); }); break;
+  }
+}
+app.addEventListener('click', onAction);
+
+load();
+render();
+})();
+</script>
+</body>
+</html>
