@@ -76,7 +76,7 @@ async function show(quiet) {
 }
 
 function draw() {
-  const db = { settings: card.settings, schedule: card.schedule || [], students: [card.student], passes: card.passes || [], visits: card.visits || [] };
+  const db = { settings: card.settings, schedule: card.schedule || [], students: [card.student], passes: card.passes || [], visits: card.visits || [], cancels: card.cancels || [] };
   C = BF.calc(db);
   const s = card.student, t = today();
   const p = C.currentPass(s.id), st = p ? C.passState(p) : null;
@@ -108,14 +108,18 @@ function draw() {
     </div>
   </section>` : `<section class="card ticket"><div class="eyebrow">Абонемента нет</div><p style="margin:0">Сейчас вы ходите разово, ${rub(db.settings.priceSingle)} за занятие.</p></section>`}
   ${note}
+  ${p && p.paid === false && !pending.some(r => r.kind === 'payment' && r.payload.passId === p.id) ? `<div class="note">Абонемент ещё не оплачен: ${rub(p.price)}. <button class="btn small" data-act="pay-owed">Я оплатила</button></div>` : ''}
+  ${(card.messages || []).length ? `<section class="msgs"><div class="eyebrow">Сообщения от преподавателя</div>${card.messages.slice(0, 3).map(m => `<div class="msg-item"><span class="hint">${fmt(m.date)}</span><p>${esc(m.text)}</p></div>`).join('')}</section>` : ''}
   ${pending.map(r => `<div class="note"><b>На проверке у преподавателя.</b> ${esc(reqText(r))}. <button class="btn small ghost" data-act="cancel-req" data-id="${r.id}">Отменить</button></div>`).join('')}
   ${decided.filter(r => diff(String(r.createdAt).slice(0, 10), t) <= 7).map(r => `<div class="note ${r.status === 'approved' ? 'ok' : 'bad'}">${r.status === 'approved' ? 'Подтверждено' : 'Отклонено'}: ${esc(reqText(r))}.</div>`).join('')}
   <div class="actions">
-    <button class="btn primary" data-act="pay">Я оплатила абонемент</button>
+    <button class="btn primary" data-act="pay">${p && (C.isLive(st) || st.key === 'future') ? 'Продлить абонемент' : 'Купить абонемент'}</button>
     <button class="btn" data-act="freeze">Пропущу по уважительной причине</button>
   </div>
   <section><div class="sec-title"><h2>Ближайшие занятия</h2></div>
     <div class="list">${up.map(u => {
+      const off = C.cancelOf(u.date, u.cls.id);
+      if (off) return `<div class="row up off"><div class="day">${DOW[parse(u.date).getDay()]}</div><div class="main"><div class="name">${esc(u.cls.title)}</div><div class="sub num">${fmt(u.date)} · отменено${off.reason ? `: ${esc(off.reason)}` : ''}</div></div><span class="pill bad">Отменено</span></div>`;
       const it = intents.find(i => i.date === u.date && i.classId === u.cls.id);
       const regular = days.includes(u.cls.id);
       const going = (regular && !(it && it.kind === 'skip')) || (it && it.kind === 'extra');
@@ -181,6 +185,26 @@ function payPage() {
   });
 }
 
+function payOwedPage() {
+  const p = C.currentPass(card.student.id);
+  let method = 'transfer';
+  ui.page(`<div class="form">
+      <p>Абонемент ${raz(p.perWeek)} в неделю с ${fmt(p.start)}: <b>${rub(p.price)}</b>.</p>
+      <div class="f">Как оплатили<div class="seg" id="method"><button type="button" data-m="transfer" aria-pressed="true">Переводом</button><button type="button" data-m="cash" aria-pressed="false">Наличными</button></div></div>
+      ${card.settings.payInfo ? `<div class="msg">${esc(card.settings.payInfo)}</div>` : ''}
+      <button class="btn primary" data-act="send-owed">Отправить</button>
+    </div>`, {
+    title: 'Оплата абонемента',
+    onMount: el => el.querySelector('#method').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; method = b.dataset.m; el.querySelectorAll('#method button').forEach(x => x.setAttribute('aria-pressed', x === b)); }),
+    onAction: async e => {
+      const a = e.target.closest('[data-act="send-owed"]'); if (!a) return;
+      a.disabled = true;
+      try { await Store.request(tok, 'payment', { passId: p.id, perWeek: p.perWeek, weeks: p.weeks, price: p.price, method }, null); ui.closePage(); toast('Отправлено преподавателю'); show(true); }
+      catch (x) { toast(x.message); a.disabled = false; }
+    },
+  });
+}
+
 /* ---------- пропуск по уважительной причине ---------- */
 function freezePage() {
   const t = today();
@@ -233,6 +257,7 @@ root.addEventListener('click', async e => {
   try {
     if (act === 'reload') show();
     if (act === 'pay') payPage();
+    if (act === 'pay-owed') payOwedPage();
     if (act === 'freeze') freezePage();
     if (act === 'install' && installEvt) { installEvt.prompt(); await installEvt.userChoice; installEvt = null; a.hidden = true; }
     if (act === 'cancel-req') { await Store.cancelRequest(tok, a.dataset.id); toast('Заявка отменена'); show(true); }

@@ -49,12 +49,13 @@ BF.defaults = () => ({
     { id: 'c3', dow: 4, title: 'Балет', start: '19:00', end: '20:30' },
     { id: 'c4', dow: 0, title: 'Балет + силовая', start: '13:00', end: '14:30' },
   ],
-  students: [], passes: [], visits: [],
+  students: [], passes: [], visits: [], cancels: [], messages: [],
 });
 BF.normalize = d => {
   const def = BF.defaults();
   const out = { ...def, ...(d || {}), settings: { ...def.settings, ...((d && d.settings) || {}) } };
   if (!Array.isArray(out.settings.plans) || !out.settings.plans.length) out.settings.plans = def.settings.plans;
+  ['cancels', 'messages'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
   return out;
 };
 BF.planTitle = p => `${raz(p.perWeek)} в неделю`;
@@ -66,7 +67,10 @@ BF.planSub = p => `${zan(p.perWeek * p.weeks)} · ${p.weeks} ${plural(p.weeks, '
 BF.calc = db => {
   const C = {};
   C.frozenDays = p => (p.freezes || []).reduce((s, f) => s + Math.max(0, diff(f.from, f.to) + 1), 0);
-  C.passEnd = p => addDays(p.start, p.weeks * 7 - 1 + C.frozenDays(p));
+  C.extraDays = p => (p.extensions || []).reduce((s, x) => s + (x.days || 0), 0);
+  C.passEnd = p => addDays(p.start, p.weeks * 7 - 1 + C.frozenDays(p) + C.extraDays(p));
+  C.unpaid = p => p.paid === false;
+  C.cancelOf = (date, classId) => (db.cancels || []).find(c => c.date === date && c.classId === classId) || null;
   C.passUsed = p => db.visits.filter(v => v.passId === p.id).length;
   C.passLeft = p => p.total - C.passUsed(p);
   C.isFrozenOn = (p, d) => (p.freezes || []).some(f => d >= f.from && d <= f.to);
@@ -108,6 +112,7 @@ BF.calc = db => {
     db.students.forEach(s => {
       const it = (intents || []).find(i => i.studentId === s.id && i.date === date && i.classId === classId);
       const regular = (days[s.id] || []).includes(classId);
+      if (C.cancelOf(date, classId)) return;
       if (it && it.kind === 'extra') coming.push({ s, extra: true });
       else if (regular && !(it && it.kind === 'skip')) coming.push({ s, extra: false });
       else if (regular) skipping.push(s);

@@ -199,12 +199,21 @@ begin
     'passes', coalesce((
       select jsonb_agg(jsonb_build_object(
         'id', p -> 'id', 'studentId', p -> 'studentId', 'perWeek', p -> 'perWeek', 'weeks', p -> 'weeks',
-        'total', p -> 'total', 'start', p -> 'start', 'freezes', coalesce(p -> 'freezes', '[]'::jsonb)))
+        'total', p -> 'total', 'start', p -> 'start', 'freezes', coalesce(p -> 'freezes', '[]'::jsonb),
+        'extensions', coalesce(p -> 'extensions', '[]'::jsonb), 'paid', p -> 'paid', 'price', p -> 'price'))
         from jsonb_array_elements(d -> 'passes') p where p ->> 'studentId' = sid), '[]'::jsonb),
     'visits', coalesce((
       select jsonb_agg(jsonb_build_object('date', v -> 'date', 'classId', v -> 'classId', 'kind', v -> 'kind', 'passId', v -> 'passId'))
         from jsonb_array_elements(d -> 'visits') v where v ->> 'studentId' = sid), '[]'::jsonb),
     'schedule', coalesce(d -> 'schedule', '[]'::jsonb),
+    'cancels', coalesce((
+      select jsonb_agg(c) from jsonb_array_elements(d -> 'cancels') c where (c ->> 'date')::date >= current_date - 1), '[]'::jsonb),
+    -- сообщения всем или лично ей за последние три недели
+    'messages', coalesce((
+      select jsonb_agg(jsonb_build_object('id', m -> 'id', 'text', m -> 'text', 'date', m -> 'date') order by m ->> 'date' desc)
+        from jsonb_array_elements(d -> 'messages') m
+       where (m -> 'to' = '"all"'::jsonb or (jsonb_typeof(m -> 'to') = 'array' and (m -> 'to') ? sid))
+         and (m ->> 'date')::date >= current_date - 21), '[]'::jsonb),
     'settings', jsonb_build_object(
       'soonLessons', d -> 'settings' -> 'soonLessons',
       'soonDays', d -> 'settings' -> 'soonDays',

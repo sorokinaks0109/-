@@ -33,6 +33,8 @@ function sample() {
   const f = mk('Марина Орлова'); attend(f, pass(f, 2, -35), ['c2', 'c4']);
   const nextOf = cid => { for (let i = 0; i < 8; i++) { const x = addDays(t, i); if (d.schedule.find(c => c.id === cid).dow === parse(x).getDay()) return x; } };
   const photo = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="420"><rect width="600" height="420" fill="#f4f4f2"/><rect x="40" y="40" width="520" height="340" fill="#fff" stroke="#999"/><text x="70" y="100" font-family="Arial" font-size="26" fill="#333">Листок нетрудоспособности</text><rect x="70" y="130" width="300" height="30" fill="#222"/><text x="70" y="210" font-family="Arial" font-size="20" fill="#555">Освобождение от работы</text><text x="70" y="250" font-family="Arial" font-size="20" fill="#555">с 08.10 по 13.10</text><rect x="70" y="290" width="200" height="26" fill="#222"/><text x="300" y="360" font-family="Arial" font-size="16" fill="#999">пример, ФИО и диагноз закрыты</text></svg>');
+  const v0 = d.passes.find(p => p.studentId === b.id); v0.paid = false; v0.paidAt = null;
+  d.messages.push({ id: uid(), date: t, to: 'all', text: 'Девочки, в воскресенье начинаем ровно в 13:00, приходите заранее размяться.' });
   const extra = {
     days: { [a.id]: ['c1', 'c2', 'c3'], [b.id]: ['c2', 'c3'], [c.id]: ['c1', 'c2', 'c3', 'c4'], [o.id]: ['c3'], [e.id]: ['c2', 'c3', 'c4'] },
     intents: [{ studentId: b.id, date: nextOf('c2'), classId: 'c2', kind: 'skip' }, { studentId: o.id, date: nextOf('c4'), classId: 'c4', kind: 'extra' }],
@@ -73,6 +75,12 @@ const exPill = s => s && s.example ? ' <span class="pill ex">пример</span>
 const nameOf = (r) => r.kind === 'join' ? r.payload.name : (C.studentById(r.studentId)?.name || 'Ученица');
 
 /* ---------- Неделя ---------- */
+function debts() {
+  const out = [];
+  db.passes.filter(p => C.unpaid(p)).forEach(p => out.push({ kind: 'pass', id: p.id, sid: p.studentId, sum: p.price, text: `абонемент ${raz(p.perWeek)} в неделю с ${fmt(p.start)}` }));
+  db.visits.filter(v => v.kind === 'single' && v.paid === false).forEach(v => out.push({ kind: 'visit', id: v.id, sid: v.studentId, sum: v.price, text: `разовое ${fmt(v.date)}` }));
+  return out;
+}
 function renderWeek() {
   const t = today(), ws = weekStart(selDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
@@ -88,9 +96,15 @@ function renderWeek() {
     if (st.key === 'soon' || ((st.key === 'used' || st.key === 'expired') && diff(st.end, t) <= 14)) soon.push({ s, p, st });
   });
   soon.sort((a, b) => a.st.left - b.st.left || a.st.daysLeft - b.st.daysLeft);
+  const owe = debts();
   const hasExamples = db.students.some(s => s.example);
 
   const classCard = cls => {
+    const cancel = C.cancelOf(selDate, cls.id);
+    if (cancel) return `<article class="card cls cancelled">
+      <div class="cls-head"><div class="cls-time disp">${cls.start}</div><div class="main"><h3>${esc(cls.title)}</h3><div class="hint">Отменено${cancel.reason ? `: ${esc(cancel.reason)}` : ''}${cancel.extended?.length ? `. Абонементы продлены: ${cancel.extended.length}` : ''}</div></div></div>
+      <button class="btn block" data-act="restore-class" data-date="${selDate}" data-class="${cls.id}">Вернуть занятие</button>
+    </article>`;
     const visits = db.visits.filter(v => v.date === selDate && v.classId === cls.id);
     const exp = C.expected(selDate, cls.id, inbox.days, inbox.intents);
     const past = C.isPast(selDate, cls);
@@ -105,17 +119,19 @@ function renderWeek() {
         ${!marked && exp.skipping.length ? `<p class="hint">Не придут: ${exp.skipping.map(s => esc(firstName(s.name))).join(', ')}</p>` : ''}
       </div>
       <button class="btn ${past && !marked ? 'primary' : ''} block" data-act="mark" data-date="${selDate}" data-class="${cls.id}">${marked ? 'Изменить отметку' : 'Отметить, кто пришёл'}</button>
+      ${!marked && !past ? `<div class="btns"><button class="btn small" data-act="cancel-class" data-date="${selDate}" data-class="${cls.id}">Отменить занятие</button><button class="btn small" data-act="message" data-date="${selDate}" data-class="${cls.id}">Написать тем, кто придёт</button></div>` : ''}
     </article>`;
   };
 
   app.innerHTML = `<div class="screen">
     ${hasExamples ? `<div class="banner"><span>Здесь выдуманные ученицы для примера.</span><button class="btn small" data-act="clear-examples">Убрать примеры</button></div>` : ''}
     ${inbox.requests.length ? `<button class="banner link" data-act="go-inbox"><span>Новые заявки: ${inbox.requests.length}. ${inbox.requests.slice(0, 2).map(r => esc(firstName(nameOf(r)))).join(', ')}${inbox.requests.length > 2 ? '…' : ''}</span><span aria-hidden="true">→</span></button>` : ''}
+    <div class="btns"><button class="btn" style="flex:1" data-act="message">Написать ученицам</button><button class="btn" style="flex:1" data-act="schedule">Расписание</button></div>
     <section class="week">
       <div class="week-head"><button class="iconbtn" data-act="week" data-d="-7" aria-label="Предыдущая неделя">‹</button><div class="disp">${monthLabel}</div><button class="iconbtn" data-act="week" data-d="7" aria-label="Следующая неделя">›</button></div>
       <div class="week-days">${days.map(d => {
-        const has = C.classesFor(d).length, marked = db.visits.some(v => v.date === d);
-        return `<button class="wd ${d === selDate ? 'sel' : ''} ${d === t ? 'today' : ''}" data-act="day" data-d="${d}" ${has ? '' : 'data-empty'}><small>${DOW[parse(d).getDay()]}</small><b>${parse(d).getDate()}</b><i class="${has ? (marked ? 'done' : 'dot') : ''}"></i></button>`;
+        const cls = C.classesFor(d), has = cls.length, marked = db.visits.some(v => v.date === d), allOff = has && cls.every(c => C.cancelOf(d, c.id));
+        return `<button class="wd ${d === selDate ? 'sel' : ''} ${d === t ? 'today' : ''}" data-act="day" data-d="${d}" ${has ? '' : 'data-empty'}><small>${DOW[parse(d).getDay()]}</small><b>${parse(d).getDate()}</b><i class="${allOff ? 'off' : has ? (marked ? 'done' : 'dot') : ''}"></i></button>`;
       }).join('')}</div>
       ${selDate !== t ? `<button class="btn ghost small" data-act="day" data-d="${t}">Сегодня</button>` : ''}
     </section>
@@ -130,30 +146,37 @@ function renderWeek() {
         <div class="main"><div class="name">${esc(s.name)}${exPill(s)}</div><div class="sub num">${st.key === 'soon' ? `осталось ${st.left} из ${p.total} · до ${fmt(st.end)}` : st.key === 'expired' ? `срок вышел ${fmt(st.end)}` : 'занятия закончились'}</div></div>
         <span class="pill ${st.tone}">${st.key === 'soon' ? st.left : 'всё'}</span></button>`).join('')}</div>
     </section>` : ''}
+    ${owe.length ? `<section>
+      <div class="sec-title"><h2>Не оплачено</h2><span class="num">${rub(owe.reduce((a, x) => a + Number(x.sum || 0), 0))}</span></div>
+      <div class="list">${owe.map(x => `<button class="row" data-act="open-student" data-id="${x.sid}"><div class="avatar">${esc(initials(C.studentById(x.sid)?.name || ''))}</div><div class="main"><div class="name">${esc(C.studentById(x.sid)?.name || '—')}</div><div class="sub">${x.text}</div></div><span class="pill warn num">${rub(x.sum)}</span></button>`).join('')}</div>
+    </section>` : ''}
   </div>`;
 }
 
 /* ---------- Отметка занятия ---------- */
+const NOPASS = { paid: 'разово, оплачено', debt: 'разово, в долг', newpass: 'новый абонемент, в долг' };
 function markPage(date, classId) {
   const cls = C.classById(classId);
   const existing = db.visits.filter(v => v.date === date && v.classId === classId);
   const exp = C.expected(date, classId, inbox.days, inbox.intents);
   const picked = new Set(existing.length ? existing.map(v => v.studentId) : exp.coming.map(x => x.s.id));
+  const how = {}; existing.forEach(v => { if (v.kind === 'single') how[v.studentId] = v.paid === false ? 'debt' : 'paid'; });
   const expectedIds = new Set(exp.coming.map(x => x.s.id));
   const ids = existing.map(v => v.id);
   const order = [...db.students].sort((a, b) => (expectedIds.has(b.id) - expectedIds.has(a.id)) || a.name.localeCompare(b.name, 'ru'));
 
   const draw = body => {
     const row = s => {
-      const p = C.passForVisit(s.id, date, ids), st = p ? C.passState(p, date) : null;
-      return `<button class="row" data-act="toggle" data-id="${s.id}" aria-pressed="${picked.has(s.id)}">
+      const p = C.passForVisit(s.id, date, ids), st = p ? C.passState(p, date) : null, on = picked.has(s.id);
+      return `<div class="mark-item"><button class="row" data-act="toggle" data-id="${s.id}" aria-pressed="${on}">
         <div class="check">${ui.ICON_CHECK}</div>
-        <div class="main"><div class="name">${esc(s.name)}${exPill(s)}</div><div class="sub num">${p ? `абонемент, осталось ${st.left}` : `разово, ${rub(db.settings.priceSingle)}`}${expectedIds.has(s.id) ? ' · собиралась' : ''}</div></div>
-      </button>`;
+        <div class="main"><div class="name">${esc(s.name)}${exPill(s)}</div><div class="sub num">${p ? `абонемент, осталось ${st.left}${C.unpaid(p) ? ' · не оплачен' : ''}` : 'нет действующего абонемента'}${expectedIds.has(s.id) ? ' · собиралась' : ''}</div></div>
+      </button>
+      ${on && !p ? `<div class="seg small" data-sid="${s.id}">${Object.entries(NOPASS).map(([k, l]) => `<button type="button" data-act="how" data-id="${s.id}" data-k="${k}" aria-pressed="${(how[s.id] || 'paid') === k}">${l}</button>`).join('')}</div>` : ''}</div>`;
     };
     const exp1 = order.filter(s => expectedIds.has(s.id)), rest = order.filter(s => !expectedIds.has(s.id));
     body.innerHTML = `
-      <p class="hint">${existing.length ? 'Отметка уже сохранена, можно поправить.' : 'Отмечены те, кто собирался прийти. Снимите галочку, если не пришла, и добавьте тех, кто пришёл без записи.'}</p>
+      <p class="hint">${existing.length ? 'Отметка уже сохранена, можно поправить.' : 'Отмечены те, кто собирался прийти. Снимите галочку, если не пришла, и добавьте тех, кто пришёл без записи.'} Если у пришедшей нет абонемента, выберите: разово, в долг или новый абонемент.</p>
       <button class="btn primary block" data-act="save-mark">Сохранить: пришли ${picked.size}</button>
       ${exp1.length ? `<div><div class="eyebrow" style="margin-bottom:6px">Собирались прийти</div><div class="list card">${exp1.map(row).join('')}</div></div>` : ''}
       ${rest.length ? `<div><div class="eyebrow" style="margin-bottom:6px">Остальные</div><div class="list card">${rest.map(row).join('')}</div></div>` : ''}
@@ -166,20 +189,112 @@ function markPage(date, classId) {
       const a = e.target.closest('[data-act]'); if (!a) return;
       const body = document.querySelector('#page .page-body');
       if (a.dataset.act === 'toggle') { picked.has(a.dataset.id) ? picked.delete(a.dataset.id) : picked.add(a.dataset.id); draw(body); }
+      if (a.dataset.act === 'how') { how[a.dataset.id] = a.dataset.k; draw(body); }
       if (a.dataset.act === 'save-mark') {
         db.visits = db.visits.filter(v => !(v.date === date && v.classId === classId));
-        let singles = 0;
+        let singles = 0, debt = 0;
         picked.forEach(sid => {
           const prev = existing.find(v => v.studentId === sid);
-          const p = C.passForVisit(sid, date);
+          let p = C.passForVisit(sid, date);
+          if (!p && how[sid] === 'newpass') {
+            const last = C.studentPasses(sid)[0], plans = db.settings.plans;
+            const plan = (last && plans.find(x => x.perWeek === last.perWeek && x.weeks === last.weeks)) || plans[1] || plans[0];
+            p = { id: uid(), studentId: sid, perWeek: plan.perWeek, weeks: plan.weeks, total: plan.perWeek * plan.weeks, price: plan.price, paid: false, paidAt: null, start: date, freezes: [] };
+            db.passes.push(p); debt++;
+          }
           if (p) db.visits.push({ id: prev?.id || uid(), studentId: sid, date, classId, kind: 'pass', passId: p.id });
-          else { singles++; db.visits.push({ id: prev?.id || uid(), studentId: sid, date, classId, kind: 'single', price: prev?.price ?? db.settings.priceSingle }); }
+          else {
+            singles++; const unpaid = how[sid] === 'debt'; if (unpaid) debt++;
+            db.visits.push({ id: prev?.id || uid(), studentId: sid, date, classId, kind: 'single', price: prev?.price ?? db.settings.priceSingle, paid: !unpaid });
+          }
         });
         save(); ui.closePage(); render();
-        toast(`Сохранено: ${picked.size}${singles ? `, разово ${singles}` : ''}`);
+        toast(`Сохранено: ${picked.size}${singles ? `, разово ${singles}` : ''}${debt ? `, в долг ${debt}` : ''}`);
       }
     },
   });
+}
+
+/* ---------- Отмена занятия, сообщения, расписание ---------- */
+function cancelPage(date, classId) {
+  const cls = C.classById(classId);
+  const exp = C.expected(date, classId, inbox.days, inbox.intents);
+  const live = s => { const p = C.passForVisit(s.id, date); return p ? p : null; };
+  const pick = new Set(exp.coming.filter(x => live(x.s)).map(x => x.s.id));
+  const draw = body => {
+    body.innerHTML = `
+      <label class="f">Причина, её увидят ученицы<input type="text" id="cReason" maxlength="120" placeholder="Например: заболел преподаватель"></label>
+      <div><div class="eyebrow" style="margin-bottom:6px">Продлить абонемент на неделю</div>
+        <div class="list card">${db.students.filter(s => live(s)).sort((a, b) => (pick.has(b.id) - pick.has(a.id)) || a.name.localeCompare(b.name, 'ru')).map(s => `<button class="row" data-act="pick" data-id="${s.id}" aria-pressed="${pick.has(s.id)}"><div class="check">${ui.ICON_CHECK}</div><div class="main"><div class="name">${esc(s.name)}</div><div class="sub">${exp.coming.some(x => x.s.id === s.id) ? 'собиралась прийти' : 'не собиралась'}</div></div></button>`).join('') || '<p class="empty">Ни у кого нет действующего абонемента.</p>'}</div>
+        <p class="hint" style="margin-top:6px">Отмечены те, кто собирался прийти. Им придёт сообщение об отмене.</p></div>
+      <button class="btn primary block" data-act="do-cancel">Отменить занятие</button>`;
+  };
+  ui.page('', {
+    title: `Отмена: ${esc(cls.title)}, ${fmtDow(date)}`, onMount: draw,
+    onAction: e => {
+      const a = e.target.closest('[data-act]'); if (!a) return;
+      const body = document.querySelector('#page .page-body');
+      if (a.dataset.act === 'pick') { const r = body.querySelector('#cReason').value; pick.has(a.dataset.id) ? pick.delete(a.dataset.id) : pick.add(a.dataset.id); draw(body); body.querySelector('#cReason').value = r; }
+      if (a.dataset.act === 'do-cancel') {
+        const reason = body.querySelector('#cReason').value.trim(), cid = uid();
+        const extended = [];
+        pick.forEach(sid => { const p = live(C.studentById(sid)); if (p) { (p.extensions = p.extensions || []).push({ id: uid(), days: 7, reason: 'cancel', cancelId: cid }); extended.push(sid); } });
+        db.cancels.push({ id: cid, date, classId, reason, extended });
+        const to = [...new Set([...exp.coming.map(x => x.s.id), ...extended])];
+        const text = `Занятие «${cls.title}» ${fmtDow(date)} в ${cls.start} отменено${reason ? `: ${reason}` : ''}.${extended.length ? ' Абонемент продлён на неделю.' : ''}`;
+        if (to.length) addMessage(text, to);
+        save(); ui.closePage(); render(); toast('Занятие отменено');
+        if (to.length) sharePage('Сообщение об отмене', `Ученицы увидят его в приложении. Можно также отправить в группу в Максе.`, text);
+      }
+    },
+  });
+}
+function addMessage(text, to) {
+  db.messages = (db.messages || []).filter(m => m.date >= addDays(today(), -30));
+  db.messages.push({ id: uid(), date: today(), text, to });
+}
+function messagePage(date, classId) {
+  const exp = date ? C.expected(date, classId, inbox.days, inbox.intents) : null;
+  const sel = new Set(exp ? exp.coming.map(x => x.s.id) : []);
+  let mode = exp ? 'some' : 'all';
+  const draw = body => {
+    const txt = body.querySelector('#mText')?.value || '';
+    body.innerHTML = `
+      <label class="f">Текст<textarea id="mText" maxlength="600" placeholder="Например: в четверг начнём на 15 минут позже"></textarea></label>
+      <div class="f">Кому<div class="seg" id="mMode"><button type="button" data-act="mode" data-k="all" aria-pressed="${mode === 'all'}">Всем</button><button type="button" data-act="mode" data-k="some" aria-pressed="${mode === 'some'}">Выбрать</button></div></div>
+      ${mode === 'some' ? `<div class="btns"><button class="btn small" data-act="sel-soon">У кого заканчивается</button><button class="btn small" data-act="sel-none">Снять всех</button></div>
+        <div class="list card">${[...db.students].sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(s => `<button class="row" data-act="pick" data-id="${s.id}" aria-pressed="${sel.has(s.id)}"><div class="check">${ui.ICON_CHECK}</div><div class="main"><div class="name">${esc(s.name)}</div></div></button>`).join('')}</div>` : ''}
+      <p class="hint">Сообщение появится вверху приложения у учениц и будет видно три недели.</p>
+      <button class="btn primary block" data-act="send-msg">Отправить${mode === 'some' ? ` (${sel.size})` : ''}</button>`;
+    body.querySelector('#mText').value = txt;
+  };
+  ui.page('', {
+    title: exp ? `Тем, кто придёт ${fmtDow(date)}` : 'Сообщение ученицам', onMount: draw,
+    onAction: e => {
+      const a = e.target.closest('[data-act]'); if (!a) return;
+      const body = document.querySelector('#page .page-body');
+      if (a.dataset.act === 'mode') { mode = a.dataset.k; draw(body); }
+      if (a.dataset.act === 'pick') { sel.has(a.dataset.id) ? sel.delete(a.dataset.id) : sel.add(a.dataset.id); draw(body); }
+      if (a.dataset.act === 'sel-none') { sel.clear(); draw(body); }
+      if (a.dataset.act === 'sel-soon') { db.students.forEach(s => { const p = C.currentPass(s.id); const st = p && C.passState(p); if (st && ['soon', 'used', 'expired'].includes(st.key)) sel.add(s.id); }); draw(body); }
+      if (a.dataset.act === 'send-msg') {
+        const text = body.querySelector('#mText').value.trim();
+        if (!text) { toast('Напишите текст'); return; }
+        if (mode === 'some' && !sel.size) { toast('Выберите, кому отправить'); return; }
+        addMessage(text, mode === 'all' ? 'all' : [...sel]); save(); toast('Отправлено в приложение');
+        sharePage('Отправлено', 'Ученицы увидят сообщение в приложении. Если нужно, отправьте его и в группу в Максе.', text);
+      }
+    },
+  });
+}
+function schedulePage() {
+  const draw = body => {
+    body.innerHTML = `<p class="hint">Постоянное расписание на каждую неделю. Нажмите на занятие, чтобы поменять название, день или время.</p>
+      <div class="list card">${C.sortedSchedule().map(c => `<button class="row" data-act="edit-class" data-id="${c.id}"><div class="avatar" style="font-size:13px">${DOW[c.dow]}</div><div class="main"><div class="name">${esc(c.title)}</div><div class="sub num">${DOW_FULL[c.dow]}, ${c.start}–${c.end}</div></div><span aria-hidden="true">›</span></button>`).join('')}</div>
+      <button class="btn block" data-act="edit-class" data-id="">Добавить занятие в расписание</button>
+      <p class="hint">Чтобы отменить одно конкретное занятие, выберите день на вкладке «Неделя» и нажмите «Отменить занятие».</p>`;
+  };
+  ui.page('', { title: 'Расписание', onMount: draw, onAction: e => onAction(e) });
 }
 
 /* ---------- Ученицы ---------- */
@@ -210,41 +325,62 @@ function studentPage(sid) {
   const draw = body => {
     const s = C.studentById(sid); if (!s) { ui.closePage(); return; }
     const passes = C.studentPasses(sid), cur = C.currentPass(sid), st = cur ? C.passState(cur) : null;
+    const live = cur && (C.isLive(st) || st.key === 'future');
     const visits = db.visits.filter(v => v.studentId === sid).sort((a, b) => a.date < b.date ? 1 : -1);
     const days = inbox.days[sid] || [];
+    const owe = debts().filter(x => x.sid === sid);
     body.innerHTML = `
-      <div style="display:flex;gap:12px;align-items:center"><div class="avatar">${esc(initials(s.name))}</div><div style="min-width:0"><h2 class="disp" style="font-size:24px;overflow-wrap:anywhere">${esc(s.name)}</h2><div class="hint">${esc(s.phone || '')}${s.note ? (s.phone ? ' · ' : '') + esc(s.note) : ''}</div></div></div>
-      ${cur ? `<div class="card" style="padding:14px">
-        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><div class="eyebrow">Абонемент</div><span class="pill ${st.tone}">${st.label}</span></div>
-        <div style="margin-top:6px;font-weight:500" class="num">${raz(cur.perWeek)} в неделю · ${zan(cur.total)} · ${rub(cur.price)}</div>
-        <div class="hint num">с ${fmt(cur.start)} по ${fmt(st.end)}${cur.freezes.length ? `, продлён на ${C.frozenDays(cur)} дн.` : ''}</div>
+      <div class="who"><div class="avatar">${esc(initials(s.name))}</div><div class="main"><h2 class="disp">${esc(s.name)}</h2><div class="hint">${esc(s.phone || '')}${s.note ? (s.phone ? ' · ' : '') + esc(s.note) : ''}</div></div>
+        <button class="iconbtn" data-act="student-menu" data-id="${sid}" aria-label="Изменить, объединить, удалить">⋯</button></div>
+      ${live ? `<div class="card status">
+        <div class="status-top"><div class="eyebrow">Абонемент · ${raz(cur.perWeek)} в неделю</div><span class="pill ${st.tone}">${st.key === 'future' ? st.label : st.key === 'frozen' ? 'заморожен' : 'действует'}</span></div>
+        <div class="big"><b>${st.left}</b><span>из ${cur.total} · до ${fmt(st.end)}</span></div>
         ${meter(cur, st)}
-        ${cur.freezes.length ? `<div style="margin-top:10px;display:flex;flex-direction:column;gap:4px">${cur.freezes.map(f => `<div class="hint" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${REASONS[f.reason] || 'Заморозка'}: ${fmt(f.from)} – ${fmt(f.to)}</span><button class="btn small ghost danger" data-act="del-freeze" data-pass="${cur.id}" data-id="${f.id}">убрать</button></div>`).join('')}</div>` : ''}
-      </div>` : '<p class="hint">Абонемента нет, ходит разово.</p>'}
-      <div class="btns">
-        <button class="btn primary" style="flex:1" data-act="pay" data-id="${sid}">Записать оплату</button>
-        ${cur && (C.isLive(st) || st.key === 'future') ? `<button class="btn" style="flex:1" data-act="freeze" data-id="${cur.id}">Заморозить</button>` : ''}
+        ${C.unpaid(cur) ? `<div class="note">Не оплачен: ${rub(cur.price)} <button class="btn small" data-act="mark-paid" data-kind="pass" data-id="${cur.id}">Оплачено</button></div>` : ''}
+        ${cur.freezes.length || (cur.extensions || []).length ? `<div class="hint">${cur.freezes.map(f => `${REASONS[f.reason] || 'Заморозка'}: ${fmt(f.from)} – ${fmt(f.to)} <button class="btn small ghost danger" data-act="del-freeze" data-pass="${cur.id}" data-id="${f.id}">убрать</button>`).join('<br>')}${(cur.extensions || []).length ? `${cur.freezes.length ? '<br>' : ''}Продлён из-за отмены занятий: +${C.extraDays(cur)} дн.` : ''}</div>` : ''}
+        <div class="btns"><button class="btn" style="flex:1" data-act="freeze" data-id="${cur.id}">Заморозить</button>${s.remind ? `<button class="btn" style="flex:1" data-act="remind" data-id="${sid}">Напомнить</button>` : ''}</div>
       </div>
+      <button class="btn block" data-act="pay" data-id="${sid}">Оформить следующий абонемент</button>`
+      : `<div class="card status"><div class="eyebrow">Абонемент</div><p class="disp" style="font-size:22px;margin:0">${cur ? (st.key === 'expired' ? `Закончился ${fmt(st.end)}` : 'Занятия закончились') : 'Нет абонемента'}</p>
+        <button class="btn primary block" data-act="pay" data-id="${sid}">Оформить абонемент</button></div>`}
+      ${owe.filter(x => x.kind === 'visit').length ? `<div class="card status"><div class="eyebrow">Долг за разовые</div>${owe.filter(x => x.kind === 'visit').map(x => `<div class="debt-row"><span>${x.text} · ${rub(x.sum)}</span><button class="btn small" data-act="mark-paid" data-kind="visit" data-id="${x.id}">Оплачено</button></div>`).join('')}</div>` : ''}
       <div><div class="eyebrow" style="margin-bottom:8px">Постоянные дни</div>
-        <div class="chips">${C.sortedSchedule().map(c => `<button class="chip" data-act="day-toggle" data-id="${c.id}" aria-pressed="${days.includes(c.id)}">${DOW[c.dow]} · ${esc(c.title)}</button>`).join('')}</div>
-        <p class="hint" style="margin-top:6px">Ученица может отметить дни сама в своём приложении.</p></div>
-      <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
-        <div class="eyebrow">Приложение ученицы</div>
-        <div class="btns">
-          <button class="btn small primary" data-act="send-link" data-id="${sid}">Отправить ссылку</button>
-          ${s.remind && cur && C.isLive(st) ? `<button class="btn small" data-act="remind" data-id="${sid}">Напомнить о продлении</button>` : ''}
-          <a class="btn small" href="${studentLink(s)}" target="_blank" rel="noopener">Как она видит</a>
-        </div>
-      </div>
-      ${passes.length > 1 ? `<div><div class="eyebrow" style="margin-bottom:6px">Все абонементы</div><div class="list">${passes.map(p => { const ps = C.passState(p); return `<div class="row"><div class="main"><div class="name num">${fmt(p.start)} – ${fmt(ps.end)}</div><div class="sub num">${raz(p.perWeek)} в неделю · ${zan(p.total)} · ${rub(p.price)}</div></div><span class="pill ${ps.tone}">${ps.key === 'active' || ps.key === 'soon' ? ps.left : ps.label}</span></div>`; }).join('')}</div></div>` : ''}
-      <div><div class="eyebrow" style="margin-bottom:6px">Посещения</div>
-        <div class="list">${visits.length ? visits.slice(0, 30).map(v => `<div class="row" style="min-height:44px"><div class="main"><div class="num">${fmtDow(v.date)}</div><div class="sub">${esc(C.classById(v.classId)?.title || 'занятие')}</div></div><span class="pill ${v.kind === 'single' ? 'mute' : 'ok'}">${v.kind === 'single' ? `разово, ${rub(v.price)}` : 'абонемент'}</span></div>`).join('') : '<div class="empty">Посещений пока нет.</div>'}</div></div>
+        <div class="chips">${C.sortedSchedule().map(c => `<button class="chip" data-act="day-toggle" data-sid="${sid}" data-id="${c.id}" aria-pressed="${days.includes(c.id)}">${DOW[c.dow]} · ${esc(c.title)}</button>`).join('')}</div>
+        <p class="hint" style="margin-top:6px">Ученица может отметить дни и сама, в своём приложении.</p></div>
       <div class="btns">
-        <button class="btn" style="flex:1" data-act="edit-student" data-id="${sid}">Изменить данные</button>
-        ${passes.length ? `<button class="btn ghost danger" data-act="delete-pass" data-id="${passes[0].id}">Удалить последнюю оплату</button>` : ''}
-      </div>`;
+        <button class="btn" style="flex:1" data-act="send-link" data-id="${sid}">Отправить ссылку на приложение</button>
+        <a class="btn" style="flex:1" href="${studentLink(s)}" target="_blank" rel="noopener">Как она видит</a>
+      </div>
+      ${passes.length ? `<div><div class="eyebrow" style="margin-bottom:6px">Абонементы</div><div class="list">${passes.map(p => { const ps = C.passState(p); return `<div class="row"><div class="main"><div class="name num">${fmt(p.start)} – ${fmt(ps.end)}</div><div class="sub num">${raz(p.perWeek)} в неделю · ${zan(p.total)} · ${rub(p.price)}${C.unpaid(p) ? ' · не оплачен' : ''}</div></div><button class="iconbtn" data-act="delete-pass" data-id="${p.id}" aria-label="Удалить абонемент">×</button></div>`; }).join('')}</div></div>` : ''}
+      <div><div class="eyebrow" style="margin-bottom:6px">Посещения</div>
+        <div class="list">${visits.length ? visits.slice(0, 30).map(v => `<div class="row" style="min-height:44px"><div class="main"><div class="num">${fmtDow(v.date)}</div><div class="sub">${esc(C.classById(v.classId)?.title || 'занятие')}</div></div><span class="pill ${v.kind === 'single' ? (v.paid === false ? 'warn' : 'mute') : 'ok'}">${v.kind === 'single' ? `разово${v.paid === false ? ', долг' : ''}` : 'абонемент'}</span></div>`).join('') : '<div class="empty">Посещений пока нет.</div>'}</div></div>`;
   };
   ui.page('', { title: 'Ученица', onMount: draw, onAction: e => onAction(e, () => draw(document.querySelector('#page .page-body'))) });
+}
+function studentMenu(sid) {
+  const s = C.studentById(sid);
+  ui.page(`<p class="disp" style="font-size:22px;margin:0">${esc(s.name)}</p>
+    <button class="btn block" data-act="edit-student" data-id="${sid}">Изменить имя, телефон, заметку</button>
+    <button class="btn block" data-act="merge" data-id="${sid}">Объединить с другой карточкой</button>
+    <p class="hint">Если ученица записана дважды: абонементы, посещения и дни перейдут в одну карточку, вторая удалится.</p>
+    <button class="btn block danger" data-act="delete-student" data-id="${sid}">Удалить ученицу</button>`, { title: 'Действия', onAction: e => onAction(e) });
+}
+function mergePage(sid) {
+  const s = C.studentById(sid);
+  const others = db.students.filter(x => x.id !== sid).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  ui.page(`<p>Выберите карточку, <b>которую оставить</b>. В неё перейдут абонементы, посещения и дни из карточки «${esc(s.name)}», а эта карточка удалится.</p>
+    <div class="list card">${others.map(o => `<button class="row" data-act="merge-into" data-id="${o.id}" data-from="${sid}"><div class="avatar">${esc(initials(o.name))}</div><div class="main"><div class="name">${esc(o.name)}</div><div class="sub">${C.studentPasses(o.id).length} абон. · ${db.visits.filter(v => v.studentId === o.id).length} посещ.</div></div></button>`).join('')}</div>`,
+    { title: 'Объединить', onAction: e => onAction(e) });
+}
+function mergeStudents(from, into) {
+  db.passes.forEach(p => { if (p.studentId === from) p.studentId = into; });
+  db.visits.forEach(v => { if (v.studentId === from) v.studentId = into; });
+  // одна отметка на одно занятие
+  const seen = new Set(); db.visits = db.visits.filter(v => { const k = `${v.studentId}|${v.date}|${v.classId}`; if (seen.has(k)) return false; seen.add(k); return true; });
+  const days = [...new Set([...(inbox.days[into] || []), ...(inbox.days[from] || [])])];
+  db.students = db.students.filter(x => x.id !== from);
+  inbox.days[into] = days; delete inbox.days[from];
+  save(); Store.setDaysFor(into, days).catch(() => {});
 }
 
 /* ---------- Заявки ---------- */
@@ -258,7 +394,7 @@ function renderInbox() {
     if (r.kind === 'payment') {
       const p = r.payload;
       return `<article class="card req"><div class="eyebrow">Оплата · ${when}</div><h3>${esc(s?.name || 'Ученица')}</h3>
-        <p><b>${raz(p.perWeek)} в неделю</b>, ${zan(p.perWeek * p.weeks)} на ${p.weeks} нед. · <b>${rub(p.price)}</b><br><span class="hint">${METHODS[p.method] || ''}${p.method === 'transfer' ? '. Проверьте поступление в банке.' : '. Получите деньги на занятии.'}</span></p>
+        <p>${p.passId ? 'Оплата абонемента, который уже оформлен: ' : ''}<b>${raz(p.perWeek)} в неделю</b>, ${zan(p.perWeek * p.weeks)} на ${p.weeks} нед. · <b>${rub(p.price)}</b><br><span class="hint">${METHODS[p.method] || ''}${p.method === 'transfer' ? '. Проверьте поступление в банке.' : '. Получите деньги на занятии.'}</span></p>
         <div class="btns"><button class="btn primary" data-act="approve" data-id="${r.id}">Деньги получены</button><button class="btn" data-act="reject" data-id="${r.id}">Отклонить</button></div></article>`;
     }
     const p = r.payload;
@@ -278,10 +414,12 @@ async function decide(id, approve) {
   try {
     if (approve) {
       if (r.kind === 'join') db.students.push({ id: uid(), name: r.payload.name, token: r.token, phone: '', remind: true, note: '' });
-      if (r.kind === 'payment') {
+      const owed = r.kind === 'payment' && r.payload.passId && db.passes.find(x => x.id === r.payload.passId && C.unpaid(x));
+      if (owed) { owed.paid = true; owed.paidAt = today(); }
+      else if (r.kind === 'payment') {
         const p = r.payload, prev = C.studentPasses(r.studentId)[0];
         let start = today(); if (prev) { const ps = C.passState(prev); if (C.isLive(ps)) start = addDays(ps.end, 1); }
-        db.passes.push({ id: uid(), studentId: r.studentId, perWeek: p.perWeek, weeks: p.weeks, total: p.perWeek * p.weeks, price: p.price, paidAt: today(), start, freezes: [] });
+        db.passes.push({ id: uid(), studentId: r.studentId, perWeek: p.perWeek, weeks: p.weeks, total: p.perWeek * p.weeks, price: p.price, paid: true, paidAt: today(), start, freezes: [] });
       }
       if (r.kind === 'freeze') {
         const p = r.payload;
@@ -302,8 +440,9 @@ async function decide(id, approve) {
 function renderMoney() {
   const [y, m] = moneyMonth.split('-').map(Number);
   const inMonth = d => d && d.slice(0, 7) === moneyMonth;
-  const passes = db.passes.filter(p => inMonth(p.paidAt));
-  const singles = db.visits.filter(v => v.kind === 'single' && inMonth(v.date));
+  const passes = db.passes.filter(p => !C.unpaid(p) && inMonth(p.paidAt));
+  const singles = db.visits.filter(v => v.kind === 'single' && v.paid !== false && inMonth(v.paidAt || v.date));
+  const owe = debts();
   const visits = db.visits.filter(v => inMonth(v.date));
   const passSum = passes.reduce((s, p) => s + Number(p.price || 0), 0);
   const singleSum = singles.reduce((s, v) => s + Number(v.price || 0), 0);
@@ -311,7 +450,7 @@ function renderMoney() {
   const shift = k => { const d = new Date(y, m - 1 + k, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
   const ops = [
     ...passes.map(p => ({ date: p.paidAt, text: C.studentById(p.studentId)?.name || '—', sub: `абонемент ${raz(p.perWeek)} в неделю`, sum: p.price })),
-    ...singles.map(v => ({ date: v.date, text: C.studentById(v.studentId)?.name || '—', sub: `разовое · ${C.classById(v.classId)?.title || ''}`, sum: v.price })),
+    ...singles.map(v => ({ date: v.paidAt || v.date, text: C.studentById(v.studentId)?.name || '—', sub: `разовое · ${C.classById(v.classId)?.title || ''}`, sum: v.price })),
   ].sort((a, b) => a.date < b.date ? 1 : -1);
   app.innerHTML = `<div class="screen">
     <div class="sec-title"><h2>${MONTHS_NOM[m - 1]} ${y}</h2>
@@ -323,6 +462,8 @@ function renderMoney() {
       <div class="card stat"><b>${rub(singleSum)}</b><span>разовые (${singles.length})</span></div>
     </div>
     <div class="card stat"><b>${burned}</b><span>${plural(burned, 'занятие сгорело', 'занятия сгорело', 'занятий сгорело')} у абонементов, истёкших в этом месяце</span></div>
+    ${owe.length ? `<section><div class="sec-title"><h2>Не оплачено</h2><span class="num">${rub(owe.reduce((a, x) => a + Number(x.sum || 0), 0))}</span></div>
+      <div class="list">${owe.map(x => `<div class="row"><div class="main"><div class="name">${esc(C.studentById(x.sid)?.name || '—')}</div><div class="sub">${x.text} · ${rub(x.sum)}</div></div><button class="btn small" data-act="mark-paid" data-kind="${x.kind}" data-id="${x.id}">Оплачено</button></div>`).join('')}</div></section>` : ''}
     <section><div class="sec-title"><h2>Оплаты</h2></div>
       <div class="list">${ops.length ? ops.map(o => `<div class="row" style="min-height:52px"><div class="main"><div class="name">${esc(o.text)}</div><div class="sub">${fmt(o.date)} · ${esc(o.sub)}</div></div><b class="num" style="font-weight:500">${rub(o.sum)}</b></div>`).join('') : '<div class="empty">В этом месяце оплат нет.</div>'}</div></section>
   </div>`;
@@ -354,10 +495,9 @@ function renderSettings() {
       <p class="hint">Подставляется: {имя}, {осталось}, {до}, {ссылка}.</p>
       <button class="btn primary" data-act="save-settings">Сохранить настройки</button>
     </section>
-    <section>
+    <section class="form">
       <div class="sec-title"><h2>Расписание</h2></div>
-      <div class="list">${C.sortedSchedule().map(c => `<button class="row" data-act="edit-class" data-id="${c.id}"><div class="avatar" style="font-size:13px">${DOW[c.dow]}</div><div class="main"><div class="name">${esc(c.title)}</div><div class="sub num">${DOW_FULL[c.dow]}, ${c.start}–${c.end}</div></div></button>`).join('')}</div>
-      <button class="btn ghost" style="margin-top:8px" data-act="edit-class" data-id="">Добавить занятие</button>
+      <button class="btn" data-act="schedule">Изменить расписание</button>
     </section>
     <section class="form">
       <div class="sec-title"><h2>Ссылка-приглашение</h2></div>
@@ -438,27 +578,34 @@ function payForm(sid) {
   if (prev) { const same = plans.find(p => p.perWeek === prev.perWeek && p.weeks === prev.weeks); if (same) planId = same.id; }
   let start = t; if (prev) { const ps = C.passState(prev); if (C.isLive(ps)) start = addDays(ps.end, 1); }
   ui.page(`<form class="form" id="pForm">
-      <p class="hint">${esc(C.studentById(sid).name)}</p>
+      <p class="disp" style="font-size:20px;margin:0">${esc(C.studentById(sid).name)}</p>
       <div class="plan-cards" id="pPlans">${plans.map(p => `<button type="button" class="plan" data-id="${p.id}" aria-pressed="${p.id === planId}"><b>${BF.planTitle(p)}</b><span>${BF.planSub(p)}</span><em>${rub(p.price)}</em></button>`).join('')}</div>
       <div class="grid2"><label class="f">Начало<input type="date" id="pStart" value="${start}"></label><label class="f">Сумма, ₽<input type="number" inputmode="numeric" id="pPrice" min="0"></label></div>
+      <label class="switch">Уже оплачено<input type="checkbox" id="pPaid" checked></label>
+      <label class="switch" id="pConvLine" hidden><span id="pConvText"></span><input type="checkbox" id="pConv" checked></label>
       <div class="summary" id="pSum"></div>
-      <button class="btn primary" type="submit">Записать оплату</button>
+      <button class="btn primary" type="submit">Оформить абонемент</button>
     </form>`, {
-    title: 'Оплата абонемента',
+    title: 'Оформить абонемент',
     onMount: el => {
       const $ = q => el.querySelector(q);
+      const singlesFrom = s => db.visits.filter(v => v.studentId === sid && v.kind === 'single' && v.date >= s);
       const upd = () => {
         const p = plans.find(x => x.id === planId); $('#pPrice').value = p.price;
-        const s = $('#pStart').value || t;
-        $('#pSum').innerHTML = `<b>${zan(p.perWeek * p.weeks)}</b>, действует <b>с ${fmt(s)} по ${fmt(addDays(s, p.weeks * 7 - 1))}</b>.`;
+        const s = $('#pStart').value || t, sg = singlesFrom(s);
+        $('#pConvLine').hidden = !sg.length;
+        $('#pConvText').textContent = `Засчитать в абонемент разовые с ${fmt(s)}: ${sg.length}`;
+        $('#pSum').innerHTML = `<b>${zan(p.perWeek * p.weeks)}</b>, действует <b>с ${fmt(s)} по ${fmt(addDays(s, p.weeks * 7 - 1))}</b>.${$('#pPaid').checked ? '' : ' Будет в списке «Не оплачено», пока не отметите оплату.'}`;
       };
       $('#pPlans').addEventListener('click', e => { const b = e.target.closest('.plan'); if (!b) return; planId = b.dataset.id; $('#pPlans').querySelectorAll('.plan').forEach(x => x.setAttribute('aria-pressed', x === b)); upd(); });
-      $('#pStart').addEventListener('change', upd); upd();
+      $('#pStart').addEventListener('change', upd); $('#pPaid').addEventListener('change', upd); upd();
       $('#pForm').addEventListener('submit', e => {
         e.preventDefault();
-        const p = plans.find(x => x.id === planId);
-        db.passes.push({ id: uid(), studentId: sid, perWeek: p.perWeek, weeks: p.weeks, total: p.perWeek * p.weeks, price: Number($('#pPrice').value) || 0, paidAt: t, start: $('#pStart').value || t, freezes: [] });
-        save(); toast('Оплата записана'); render(); studentPage(sid);
+        const p = plans.find(x => x.id === planId), paid = $('#pPaid').checked, s = $('#pStart').value || t;
+        const pass = { id: uid(), studentId: sid, perWeek: p.perWeek, weeks: p.weeks, total: p.perWeek * p.weeks, price: Number($('#pPrice').value) || 0, paid, paidAt: paid ? t : null, start: s, freezes: [] };
+        db.passes.push(pass);
+        if (!$('#pConvLine').hidden && $('#pConv').checked) singlesFrom(s).slice(0, pass.total).forEach(v => { v.kind = 'pass'; v.passId = pass.id; delete v.price; delete v.paid; });
+        save(); toast(paid ? 'Абонемент оформлен' : 'Абонемент оформлен, ждёт оплаты'); render(); studentPage(sid);
       });
     },
   });
@@ -510,7 +657,7 @@ function classForm(id) {
       e.preventDefault();
       const data = { title: el.querySelector('#cTitle').value.trim() || 'Занятие', dow: Number(el.querySelector('#cDow').value), start: el.querySelector('#cStart').value, end: el.querySelector('#cEnd').value };
       if (id) Object.assign(C.classById(id), data); else db.schedule.push({ id: uid(), ...data });
-      save(); ui.closePage(); render();
+      save(); render(); toast('Расписание сохранено'); schedulePage();
     }),
   });
 }
@@ -538,10 +685,26 @@ async function onAction(e, redraw) {
     case 'new-student': studentForm(null); break;
     case 'edit-student': studentForm(id); break;
     case 'pay': payForm(id); break;
+    case 'student-menu': studentMenu(id); break;
+    case 'merge': mergePage(id); break;
+    case 'merge-into': { const from = el.dataset.from, a = C.studentById(from), b = C.studentById(id);
+      confirmPage('Объединить?', `Всё из карточки «${a.name}» перейдёт в «${b.name}», карточка «${a.name}» удалится.`, 'Объединить', () => { mergeStudents(from, id); render(); toast('Объединено'); studentPage(id); }); break; }
+    case 'mark-paid': {
+      if (el.dataset.kind === 'pass') { const p = db.passes.find(x => x.id === id); p.paid = true; p.paidAt = today(); }
+      else { const v = db.visits.find(x => x.id === id); v.paid = true; v.paidAt = today(); }
+      save(); render(); redraw && redraw(); toast('Отмечено как оплачено'); break;
+    }
+    case 'cancel-class': cancelPage(el.dataset.date, el.dataset.class); break;
+    case 'restore-class': { const c = C.cancelOf(el.dataset.date, el.dataset.class);
+      confirmPage('Вернуть занятие?', `Занятие снова будет в расписании.${c.extended?.length ? ' Продление абонементов из-за этой отмены уберётся.' : ''}`, 'Вернуть', () => {
+        db.passes.forEach(p => { if (p.extensions) p.extensions = p.extensions.filter(x => x.cancelId !== c.id); });
+        db.cancels = db.cancels.filter(x => x !== c); save(); render(); toast('Занятие возвращено'); }); break; }
+    case 'message': messagePage(el.dataset.date, el.dataset.class); break;
+    case 'schedule': schedulePage(); break;
     case 'freeze': freezeForm(id); break;
     case 'del-freeze': { const p = db.passes.find(x => x.id === el.dataset.pass); p.freezes = p.freezes.filter(f => f.id !== id); save(); render(); redraw && redraw(); break; }
     case 'day-toggle': {
-      const sid = document.querySelector('#page [data-act="pay"]')?.dataset.id; if (!sid) break;
+      const sid = el.dataset.sid; if (!sid) break;
       const cur = new Set(inbox.days[sid] || []); cur.has(id) ? cur.delete(id) : cur.add(id);
       const list = [...cur]; inbox.days[sid] = list; redraw && redraw(); render();
       Store.setDaysFor(sid, list).catch(err => toast(err.message)); break;
@@ -562,8 +725,8 @@ async function onAction(e, redraw) {
     case 'refresh': await refreshInbox(true); break;
     case 'delete-student': { const s = C.studentById(id); confirmPage('Удалить ученицу?', `${s.name}: её абонементы и посещения удалятся.`, 'Удалить', () => {
       db.students = db.students.filter(x => x.id !== id); db.passes = db.passes.filter(p => p.studentId !== id); db.visits = db.visits.filter(v => v.studentId !== id); save(); render(); toast('Удалено'); }); break; }
-    case 'delete-pass': { const p = db.passes.find(x => x.id === id); confirmPage('Удалить оплату?', `Абонемент с ${fmt(p.start)} на ${zan(p.total)}, ${rub(p.price)}. Посещения по нему станут разовыми без оплаты.`, 'Удалить', () => {
-      db.visits.forEach(v => { if (v.passId === id) { v.kind = 'single'; v.price = 0; delete v.passId; } }); db.passes = db.passes.filter(x => x.id !== id); save(); render(); studentPage(p.studentId); }); break; }
+    case 'delete-pass': { const p = db.passes.find(x => x.id === id); confirmPage('Удалить абонемент?', `Абонемент с ${fmt(p.start)} на ${zan(p.total)}, ${rub(p.price)}. Посещения по нему станут разовыми.`, 'Удалить', () => {
+      db.visits.forEach(v => { if (v.passId === id) { v.kind = 'single'; v.price = db.settings.priceSingle; v.paid = false; delete v.passId; } }); db.passes = db.passes.filter(x => x.id !== id); save(); render(); studentPage(p.studentId); }); break; }
     case 'month': moneyMonth = el.dataset.m; render(); break;
     case 'plan-add': db.settings.plans = [...readPlans(), { id: uid(), perWeek: 1, weeks: 4, price: 4 * db.settings.pricePerLesson }]; render(); break;
     case 'plan-del': { const ps = readPlans(); if (ps.length <= 1) { toast('Нужен хотя бы один вариант'); break; } ps.splice(Number(el.dataset.i), 1); db.settings.plans = ps; render(); break; }
@@ -573,7 +736,7 @@ async function onAction(e, redraw) {
       save(); toast('Настройки сохранены'); break;
     }
     case 'edit-class': classForm(id); break;
-    case 'delete-class': confirmPage('Удалить занятие из расписания?', 'Прошлые отметки посещений сохранятся.', 'Удалить', () => { db.schedule = db.schedule.filter(c => c.id !== id); save(); render(); }); break;
+    case 'delete-class': confirmPage('Удалить занятие из расписания?', 'Прошлые отметки посещений сохранятся.', 'Удалить', () => { db.schedule = db.schedule.filter(c => c.id !== id); save(); render(); schedulePage(); }); break;
     case 'export': exportFile(); break;
     case 'copy-backup': ui.copy(JSON.stringify(db), 'Копия скопирована, вставьте её в «Избранное»'); break;
     case 'clear-examples': confirmPage('Убрать примеры?', 'Выдуманные ученицы, их абонементы и посещения удалятся. Расписание и цены останутся.', 'Убрать', () => {
