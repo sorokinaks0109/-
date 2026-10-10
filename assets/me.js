@@ -154,16 +154,14 @@ function bubbles(list) {
 function msgBlock() {
   const list = feed().slice(-3);
   return `<section class="msgs"><div class="eyebrow">Сообщения</div>
-    ${list.length ? `<div class="thread">${bubbles(list)}</div>` : '<p class="hint" style="margin:0">Здесь будут сообщения от преподавателя. Можно написать ему, если опаздываете или есть вопрос.</p>'}
+    ${list.length ? `<div class="thread">${bubbles(list)}</div>` : '<p class="hint" style="margin:0">Здесь будут сообщения от преподавателя. Сюда же можно написать ему.</p>'}
     <button class="btn" data-act="write">Написать преподавателю</button></section>`;
 }
-const QUICK = ['Опоздаю на 10–15 минут', 'Сегодня не смогу прийти', 'Оплатила абонемент переводом', 'Есть вопрос по абонементу'];
 function chatPage() {
   const draw = body => {
     const keep = body.querySelector('#wText')?.value || '';
     const list = feed();
     body.innerHTML = `<div class="thread">${list.length ? bubbles(list) : '<p class="empty">Сообщений пока нет.</p>'}</div>
-      <div class="chips">${QUICK.map(q => `<button type="button" class="chip" data-act="quick" data-t="${esc(q)}">${esc(q)}</button>`).join('')}</div>
       <label class="f">Сообщение<textarea id="wText" rows="3" maxlength="1000" placeholder="Напишите преподавателю"></textarea></label>
       <button class="btn primary block" data-act="w-send">Отправить</button>`;
     body.querySelector('#wText').value = keep;
@@ -174,7 +172,6 @@ function chatPage() {
     onAction: async e => {
       const a = e.target.closest('[data-act]'); if (!a) return;
       const body = document.querySelector('#page .page-body'), ta = body.querySelector('#wText');
-      if (a.dataset.act === 'quick') { ta.value = ta.value ? `${ta.value} ${a.dataset.t}` : a.dataset.t; ta.focus(); }
       if (a.dataset.act === 'w-send') {
         const t = ta.value.trim(); if (!t) { toast('Напишите текст'); return; }
         a.disabled = true;
