@@ -56,6 +56,18 @@ alter table public.requests add column if not exists has_photo boolean generated
 create index if not exists requests_owner_status on public.requests (owner, status);
 create index if not exists requests_token on public.requests (token);
 
+-- Переписка ученицы с преподавателем. from_teacher: кто написал. read_at: когда прочитала другая сторона.
+create table if not exists public.chat (
+  id           uuid primary key default gen_random_uuid(),
+  owner        uuid not null references auth.users on delete cascade,
+  student_id   text not null,
+  from_teacher boolean not null,
+  text         text not null check (length(text) between 1 and 1000),
+  created_at   timestamptz not null default now(),
+  read_at      timestamptz
+);
+create index if not exists chat_owner_student on public.chat (owner, student_id, created_at);
+
 -- ---------------------------------------------------------------------------
 -- Доступ преподавателя: только свои строки. Ученицы работают только через функции ниже.
 -- ---------------------------------------------------------------------------
@@ -63,6 +75,7 @@ alter table public.studio enable row level security;
 alter table public.student_days enable row level security;
 alter table public.intents enable row level security;
 alter table public.requests enable row level security;
+alter table public.chat enable row level security;
 
 drop policy if exists "studio: свои данные" on public.studio;
 create policy "studio: свои данные" on public.studio for select using (owner = auth.uid());
@@ -82,7 +95,10 @@ drop policy if exists "requests: удаление" on public.requests;
 create policy "requests: удаление" on public.requests for delete using (owner = auth.uid());
 revoke insert on public.requests from anon, authenticated;
 
-revoke all on public.student_days, public.intents, public.requests, public.studio from anon;
+drop policy if exists "chat: свои" on public.chat;
+create policy "chat: свои" on public.chat for all using (owner = auth.uid()) with check (owner = auth.uid());
+
+revoke all on public.student_days, public.intents, public.requests, public.studio, public.chat from anon;
 
 -- Разобранная заявка теряет фото сразу.
 create or replace function public.requests_drop_photo()
@@ -105,6 +121,7 @@ returns void language sql security definer set search_path = public as $$
   update requests set photo = null where photo is not null and created_at < now() - interval '14 days';
   delete from requests where status <> 'new' and resolved_at < now() - interval '90 days';
   delete from intents where date < current_date - 7;
+  delete from chat where created_at < now() - interval '180 days';
 $$;
 revoke all on function public.cleanup() from public, anon, authenticated;
 
@@ -193,6 +210,7 @@ begin
 
   sid := f.o_student ->> 'id';
   select data into d from studio where owner = f.o_owner;
+  update chat set read_at = now() where owner = f.o_owner and student_id = sid and from_teacher and read_at is null;
 
   return jsonb_build_object(
     'student', jsonb_build_object('id', sid, 'name', f.o_student -> 'name'),
@@ -225,6 +243,9 @@ begin
     'intents', coalesce((
       select jsonb_agg(jsonb_build_object('date', i.date, 'classId', i.class_id, 'kind', i.kind))
         from intents i where i.owner = f.o_owner and i.student_id = sid and i.date >= current_date), '[]'::jsonb),
+    'chat', coalesce((
+      select jsonb_agg(jsonb_build_object('id', x.id, 'fromTeacher', x.from_teacher, 'text', x.text, 'at', x.created_at, 'read', x.read_at is not null) order by x.created_at)
+        from (select * from chat where owner = f.o_owner and student_id = sid and created_at > now() - interval '60 days' order by created_at desc limit 60) x), '[]'::jsonb),
     'requests', coalesce((
       select jsonb_agg(jsonb_build_object('id', r.id, 'kind', r.kind, 'payload', r.payload, 'status', r.status,
                                           'createdAt', r.created_at, 'hasPhoto', r.photo is not null) order by r.created_at desc)
@@ -333,3 +354,22 @@ end;
 $$;
 revoke all on function public.student_cancel_request(text, uuid) from public;
 grant execute on function public.student_cancel_request(text, uuid) to anon, authenticated;
+
+-- Ученица пишет преподавателю.
+create or replace function public.student_message(p_token text, p_text text)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  f record;
+begin
+  select * into f from find_student(p_token);
+  if f.o_student is null then raise exception 'not found'; end if;
+  p_text := btrim(coalesce(p_text, ''));
+  if length(p_text) < 1 or length(p_text) > 1000 then raise exception 'bad text'; end if;
+  if (select count(*) from chat where owner = f.o_owner and student_id = f.o_student ->> 'id' and not from_teacher and created_at > now() - interval '1 day') >= 30 then
+    raise exception 'too many';
+  end if;
+  insert into chat (owner, student_id, from_teacher, text) values (f.o_owner, f.o_student ->> 'id', false, p_text);
+end;
+$$;
+revoke all on function public.student_message(text, text) from public;
+grant execute on function public.student_message(text, text) to anon, authenticated;

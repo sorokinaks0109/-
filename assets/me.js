@@ -110,7 +110,7 @@ function draw() {
   ${p ? `<section><div class="sec-title"><h2>Мой календарь</h2><span>${fmt(p.start)} – ${fmt(st.end)}</span></div>${BF.calendar(C, db, s.id, p, days, (intents || []).map(i => ({ ...i, studentId: s.id })))}</section>` : ''}
   ${note}
   ${p && p.paid === false && !pending.some(r => r.kind === 'payment' && r.payload.passId === p.id) ? `<div class="note">Абонемент ещё не оплачен: ${rub(p.price)}. <button class="btn small" data-act="pay-owed">Я оплатила</button></div>` : ''}
-  ${(card.messages || []).length ? `<section class="msgs"><div class="eyebrow">Сообщения от преподавателя</div>${card.messages.slice(0, 3).map(m => `<div class="msg-item"><span class="hint">${fmt(m.date)}</span><p>${esc(m.text)}</p></div>`).join('')}</section>` : ''}
+  ${msgBlock()}
   ${pending.map(r => `<div class="note"><b>На проверке у преподавателя.</b> ${esc(reqText(r))}. <button class="btn small ghost" data-act="cancel-req" data-id="${r.id}">Отменить</button></div>`).join('')}
   ${decided.filter(r => diff(String(r.createdAt).slice(0, 10), t) <= 7).map(r => `<div class="note ${r.status === 'approved' ? 'ok' : 'bad'}">${r.status === 'approved' ? 'Подтверждено' : 'Отклонено'}: ${esc(reqText(r))}.</div>`).join('')}
   <div class="actions">
@@ -140,6 +140,46 @@ function draw() {
     <div class="list">${visits.length ? visits.slice(0, 30).map(v => `<div class="row" style="min-height:48px"><div class="main"><div class="num">${fmtDow(v.date)}</div><div class="sub">${esc(C.classById(v.classId)?.title || 'занятие')}</div></div><span class="pill ${v.kind === 'single' ? 'mute' : 'ok'}">${v.kind === 'single' ? 'разово' : 'абонемент'}</span></div>`).join('') : '<div class="empty">Пока нет отмеченных занятий.</div>'}</div></section>
   ${installBlock()}
   <p class="footer-mark">Ballet Forever</p>`;
+}
+
+const when = at => { const d = new Date(at), day = BF.iso(d); return `${day === today() ? 'сегодня' : day === addDays(today(), -1) ? 'вчера' : fmt(day)}, ${BF.pad(d.getHours())}:${BF.pad(d.getMinutes())}`; };
+// Объявления для всех и личная переписка — одной лентой
+function feed() {
+  const a = (card.messages || []).map(m => ({ text: m.text, at: m.date + 'T12:00:00', fromTeacher: true, broadcast: true }));
+  return [...a, ...(card.chat || [])].sort((x, y) => String(x.at) < String(y.at) ? -1 : 1);
+}
+function bubbles(list) {
+  return list.map(m => `<div class="bubble ${m.fromTeacher ? '' : 'me'}"><p>${esc(m.text)}</p><span>${m.broadcast ? `${fmt(String(m.at).slice(0, 10))} · для всех` : when(m.at)}${!m.fromTeacher && m.read ? ' · прочитано' : ''}</span></div>`).join('');
+}
+function msgBlock() {
+  const list = feed().slice(-3);
+  return `<section class="msgs"><div class="eyebrow">Сообщения</div>
+    ${list.length ? `<div class="thread">${bubbles(list)}</div>` : '<p class="hint" style="margin:0">Здесь будут сообщения от преподавателя. Сюда же можно написать ему.</p>'}
+    <button class="btn" data-act="write">Написать преподавателю</button></section>`;
+}
+function chatPage() {
+  const draw = body => {
+    const keep = body.querySelector('#wText')?.value || '';
+    const list = feed();
+    body.innerHTML = `<div class="thread">${list.length ? bubbles(list) : '<p class="empty">Сообщений пока нет.</p>'}</div>
+      <label class="f">Сообщение<textarea id="wText" rows="3" maxlength="1000" placeholder="Напишите преподавателю"></textarea></label>
+      <button class="btn primary block" data-act="w-send">Отправить</button>`;
+    body.querySelector('#wText').value = keep;
+    const th = body.querySelector('.thread'); th.scrollTop = th.scrollHeight;
+  };
+  ui.page('', {
+    title: 'Сообщения', onMount: draw,
+    onAction: async e => {
+      const a = e.target.closest('[data-act]'); if (!a) return;
+      const body = document.querySelector('#page .page-body'), ta = body.querySelector('#wText');
+      if (a.dataset.act === 'w-send') {
+        const t = ta.value.trim(); if (!t) { toast('Напишите текст'); return; }
+        a.disabled = true;
+        try { await Store.say(tok, t); ta.value = ''; card = await Store.card(tok) || card; draw(body); a.disabled = false; toast('Отправлено'); show(true); }
+        catch (x) { toast(x.message); a.disabled = false; }
+      }
+    },
+  });
 }
 
 function installBlock() {
@@ -284,6 +324,7 @@ root.addEventListener('click', async e => {
     if (act === 'pay') payPage();
     if (act === 'pay-owed') payOwedPage();
     if (act === 'pay-existing') payPage('existing');
+    if (act === 'write') chatPage();
     if (act === 'freeze') freezePage();
     if (act === 'install' && installEvt) { installEvt.prompt(); await installEvt.userChoice; installEvt = null; a.hidden = true; }
     if (act === 'cancel-req') { await Store.cancelRequest(tok, a.dataset.id); toast('Заявка отменена'); show(true); }

@@ -5,9 +5,10 @@ const BF = window.BF, Store = BF.Store, ui = BF.ui;
 const { today, addDays, diff, parse, weekStart, fmt, fmtDow, plural, zan, raz, rub, uid, token, esc, initials, firstName, callName, pad, DOW, DOW_FULL, MONTHS, MONTHS_NOM, REASONS, METHODS } = BF;
 const BASE = new URL('./', location.href).href;
 
-let db, C, inbox = { requests: [], days: {}, intents: [] };
+let db, C, inbox = { requests: [], days: {}, intents: [], unread: [] };
 let tab = 'week', selDate = today(), studentFilter = '', moneyMonth = today().slice(0, 7);
 const setDb = d => { db = d; C = BF.calc(db); };
+BF.app = { db: () => db, save: () => Store.save(db) };
 const save = () => Store.save(db);
 const studentLink = s => `${BASE}me/?t=${s.token}`;
 const inviteLink = () => `${BASE}me/?join=${Store.invite}`;
@@ -37,6 +38,7 @@ function sample() {
   d.messages.push({ id: uid(), date: t, to: 'all', text: 'Девочки, в воскресенье начинаем ровно в 13:00, приходите заранее размяться.' });
   const extra = {
     days: { [a.id]: ['c1', 'c2', 'c3'], [b.id]: ['c2', 'c3'], [c.id]: ['c1', 'c2', 'c3', 'c4'], [o.id]: ['c3'], [e.id]: ['c2', 'c3', 'c4'] },
+    chat: [{ id: uid(), studentId: b.id, fromTeacher: false, text: 'Добрый вечер! В четверг опоздаю минут на 10, с работы не успеваю.', at: new Date().toISOString(), read: false }],
     intents: [{ studentId: b.id, date: nextOf('c2'), classId: 'c2', kind: 'skip' }, { studentId: o.id, date: nextOf('c4'), classId: 'c4', kind: 'extra' }],
     requests: [
       { id: uid(), studentId: a.id, kind: 'payment', payload: { planId: 'p3', perWeek: 3, weeks: 4, price: 6000, method: 'transfer' }, photo: null, status: 'new', createdAt: new Date().toISOString() },
@@ -63,10 +65,12 @@ tabsEl.addEventListener('click', e => { const b = e.target.closest('button[data-
 document.getElementById('settingsBtn').addEventListener('click', () => setTab('settings'));
 function setTab(t) { tab = t; render(); window.scrollTo(0, 0); }
 function render() {
-  const n = inbox.requests.length;
-  tabsEl.innerHTML = [['week', 'Неделя'], ['students', 'Ученицы'], ['inbox', `Заявки${n ? ` <b class="count">${n}</b>` : ''}`], ['money', 'Деньги']]
+  const unreadBy = [...new Set((inbox.unread || []).map(m => m.studentId))];
+  const n = inbox.requests.length + unreadBy.length;
+  tabsEl.innerHTML = [['week', 'Неделя'], ['students', 'Ученицы'], ['inbox', `Входящие${n ? ` <b class="count">${n}</b>` : ''}`], ['money', 'Деньги'], ['music', 'Музыка']]
     .map(([k, l]) => `<button data-tab="${k}" ${tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('');
-  ({ week: renderWeek, students: renderStudents, inbox: renderInbox, money: renderMoney, settings: renderSettings })[tab]();
+  if (tab === 'music') BF.music.render(app);
+  else ({ week: renderWeek, students: renderStudents, inbox: renderInbox, money: renderMoney, settings: renderSettings })[tab]();
   showSync();
 }
 
@@ -125,7 +129,7 @@ function renderWeek() {
 
   app.innerHTML = `<div class="screen">
     ${hasExamples ? `<div class="banner"><span>Здесь выдуманные ученицы для примера.</span><button class="btn small" data-act="clear-examples">Убрать примеры</button></div>` : ''}
-    ${inbox.requests.length ? `<button class="banner link" data-act="go-inbox"><span>Новые заявки: ${inbox.requests.length}. ${inbox.requests.slice(0, 2).map(r => esc(firstName(nameOf(r)))).join(', ')}${inbox.requests.length > 2 ? '…' : ''}</span><span aria-hidden="true">→</span></button>` : ''}
+    ${inbox.requests.length || (inbox.unread || []).length ? `<button class="banner link" data-act="go-inbox"><span>${[inbox.requests.length ? `Новые заявки: ${inbox.requests.length}` : '', (inbox.unread || []).length ? `Сообщения: ${(inbox.unread || []).length}` : ''].filter(Boolean).join('. ')}</span><span aria-hidden="true">→</span></button>` : ''}
     <div class="btns"><button class="btn" style="flex:1" data-act="message">Написать ученицам</button><button class="btn" style="flex:1" data-act="schedule">Расписание</button></div>
     <section class="week">
       <div class="week-head"><button class="iconbtn" data-act="week" data-d="-7" aria-label="Предыдущая неделя">‹</button><div class="disp">${monthLabel}</div><button class="iconbtn" data-act="week" data-d="7" aria-label="Следующая неделя">›</button></div>
@@ -281,6 +285,7 @@ function messagePage(date, classId) {
         const text = body.querySelector('#mText').value.trim();
         if (!text) { toast('Напишите текст'); return; }
         if (mode === 'some' && !sel.size) { toast('Выберите, кому отправить'); return; }
+        if (mode === 'some' && sel.size === 1) { const one = [...sel][0]; Store.sendTo(one, text).then(() => { toast('Отправлено'); chatPage(one); }).catch(err => toast(err.message)); return; }
         addMessage(text, mode === 'all' ? 'all' : [...sel]); save(); toast('Отправлено в приложение');
         sharePage('Отправлено', 'Ученицы увидят сообщение в приложении. Если нужно, отправьте его и в группу в Максе.', text);
       }
@@ -309,7 +314,7 @@ function renderStudents() {
     <div class="list">
       ${list.length ? list.map(({ s, p, st }) => `<button class="row" data-act="open-student" data-id="${s.id}">
         <div class="avatar">${esc(initials(s.name))}</div>
-        <div class="main"><div class="name">${esc(s.name)}${exPill(s)}</div>
+        <div class="main"><div class="name">${esc(s.name)}${exPill(s)}${(inbox.unread || []).some(m => m.studentId === s.id) ? ' <span class="pill warn">сообщение</span>' : ''}</div>
           <div class="sub num">${p ? `${raz(p.perWeek)} в неделю · до ${fmt(st.end)}` : 'разовые занятия'}${(inbox.days[s.id] || []).length ? ` · ${(inbox.days[s.id]).map(id => C.classById(id) ? DOW[C.classById(id).dow] : '').filter(Boolean).join(', ')}` : ''}</div></div>
         ${p ? `<span class="pill ${st.tone} num">${st.key === 'active' || st.key === 'soon' ? `${st.left} из ${p.total}` : st.label}</span>` : '<span class="pill mute">разово</span>'}
       </button>`).join('') : '<div class="empty">Пока никого. Пригласите учениц ссылкой: они сами пришлют заявку.</div>'}
@@ -332,6 +337,7 @@ function studentPage(sid) {
     body.innerHTML = `
       <div class="who"><div class="avatar">${esc(initials(s.name))}</div><div class="main"><h2 class="disp">${esc(s.name)}</h2><div class="hint">${esc(s.phone || '')}${s.note ? (s.phone ? ' · ' : '') + esc(s.note) : ''}</div></div>
         <button class="iconbtn" data-act="student-menu" data-id="${sid}" aria-label="Изменить, объединить, удалить">⋯</button></div>
+      <button class="btn block" data-act="chat" data-id="${sid}">Написать${(inbox.unread || []).filter(m => m.studentId === sid).length ? ` · новых: ${(inbox.unread || []).filter(m => m.studentId === sid).length}` : ''}</button>
       ${live ? `<div class="card status">
         <div class="status-top"><div class="eyebrow">Абонемент · ${raz(cur.perWeek)} в неделю</div><span class="pill ${st.tone}">${st.key === 'future' ? st.label : st.key === 'frozen' ? 'заморожен' : 'действует'}</span></div>
         <div class="big"><b>${st.left}</b><span>из ${cur.total} · до ${fmt(st.end)}</span></div>
@@ -408,8 +414,13 @@ function renderInbox() {
       <p class="hint">После решения фото удалится с сервера.</p>
       <div class="btns"><button class="btn primary" data-act="approve" data-id="${r.id}">Продлить абонемент</button><button class="btn" data-act="reject" data-id="${r.id}">Отклонить</button></div></article>`;
   };
+  const groups = {}; (inbox.unread || []).forEach(m => { (groups[m.studentId] = groups[m.studentId] || []).push(m); });
+  const msgs = Object.entries(groups).map(([sid, list]) => ({ s: C.studentById(sid), list })).filter(x => x.s);
   app.innerHTML = `<div class="screen">
-    ${rs.length ? rs.map(card).join('') : '<p class="empty">Новых заявок нет. Здесь появятся оплаты, пропуски по уважительной причине и новые ученицы.</p>'}
+    ${msgs.length ? `<section><div class="sec-title"><h2>Сообщения</h2><span class="num">${(inbox.unread || []).length}</span></div>
+      <div class="list">${msgs.map(({ s, list }) => `<button class="row" data-act="chat" data-id="${s.id}"><div class="avatar">${esc(initials(s.name))}</div><div class="main"><div class="name">${esc(s.name)}</div><div class="sub">${esc(list[list.length - 1].text.slice(0, 90))}</div></div><span class="pill warn num">${list.length}</span></button>`).join('')}</div></section>` : ''}
+    ${rs.length ? `<section><div class="sec-title"><h2>Заявки</h2><span class="num">${rs.length}</span></div><div class="day">${rs.map(card).join('')}</div></section>` : ''}
+    ${!rs.length && !msgs.length ? '<p class="empty">Новых сообщений и заявок нет. Здесь появятся сообщения учениц, оплаты, пропуски и новые ученицы.</p>' : ''}
     <button class="btn ghost" data-act="refresh">Проверить новые</button>
   </div>`;
 }
@@ -671,9 +682,35 @@ function remindPage(sid) {
     onAction: e => {
       const a = e.target.closest('[data-act]'); if (!a) return;
       const t = document.getElementById('rText').value.trim(); if (!t) { toast('Текст пустой'); return; }
-      if (a.dataset.act === 'r-app') { addMessage(t, [sid]); save(); toast('Отправлено в приложение'); a.disabled = true; a.textContent = 'Отправлено в приложение'; }
+      if (a.dataset.act === 'r-app') { Store.sendTo(sid, t).then(() => toast('Отправлено в приложение')).catch(err => toast(err.message)); a.disabled = true; a.textContent = 'Отправлено в приложение'; }
       if (a.dataset.act === 'r-max') navigator.share({ text: t }).catch(() => {});
       if (a.dataset.act === 'r-copy') ui.copy(t, 'Текст скопирован');
+    },
+  });
+}
+
+const when = iso => { const d = new Date(iso); const day = BF.iso(d); return `${day === today() ? 'сегодня' : day === addDays(today(), -1) ? 'вчера' : fmt(day)}, ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+function chatPage(sid) {
+  const s = C.studentById(sid); let list = [];
+  const draw = body => {
+    const keep = body.querySelector('#cText')?.value || '';
+    body.innerHTML = `<div class="thread">${list.length ? list.map(m => `<div class="bubble ${m.fromTeacher ? 'me' : ''}"><p>${esc(m.text)}</p><span>${when(m.at)}${m.fromTeacher && m.read ? ' · прочитано' : ''}</span></div>`).join('') : '<p class="empty">Сообщений пока нет.</p>'}</div>
+      <label class="f">Сообщение<textarea id="cText" rows="3" maxlength="1000" placeholder="Например: ${esc(callName(s))}, напоминаю про оплату"></textarea></label>
+      <button class="btn primary block" data-act="c-send">Отправить в приложение</button>
+      ${navigator.share ? '<button class="btn block" data-act="c-max">Отправить в Макс…</button>' : ''}
+      <p class="hint">Если у ученицы нет приложения, отправьте в Макс.</p>`;
+    body.querySelector('#cText').value = keep;
+    const th = body.querySelector('.thread'); th.scrollTop = th.scrollHeight;
+  };
+  const load = async body => { try { list = await Store.thread(sid); inbox.unread = (inbox.unread || []).filter(m => m.studentId !== sid); render(); } catch (e) { toast(e.message); } draw(body); };
+  ui.page('<p class="empty">Загружаю…</p>', {
+    title: esc(s.name), onMount: load,
+    onAction: async e => {
+      const a = e.target.closest('[data-act]'); if (!a) return;
+      const body = document.querySelector('#page .page-body'), t = body.querySelector('#cText').value.trim();
+      if (!t) { toast('Напишите текст'); return; }
+      if (a.dataset.act === 'c-max') navigator.share({ text: t }).catch(() => {});
+      if (a.dataset.act === 'c-send') { a.disabled = true; try { await Store.sendTo(sid, t); body.querySelector('#cText').value = ''; await load(body); } catch (err) { toast(err.message); a.disabled = false; } }
     },
   });
 }
@@ -730,6 +767,7 @@ async function onAction(e, redraw) {
     case 'edit-student': studentForm(id); break;
     case 'pay': payForm(id); break;
     case 'student-menu': studentMenu(id); break;
+    case 'chat': chatPage(id); break;
     case 'merge': mergePage(id); break;
     case 'merge-into': { const from = el.dataset.from, a = C.studentById(from), b = C.studentById(id);
       confirmPage('Объединить?', `Всё из карточки «${a.name}» перейдёт в «${b.name}», карточка «${a.name}» удалится.`, 'Объединить', () => { mergeStudents(from, id); render(); toast('Объединено'); studentPage(id); }); break; }
@@ -794,7 +832,7 @@ async function onAction(e, redraw) {
 app.addEventListener('click', e => onAction(e));
 
 async function refreshInbox(loud) {
-  try { inbox = await Store.inbox(); if (!document.getElementById('page')) render(); if (loud) toast(inbox.requests.length ? `Новых заявок: ${inbox.requests.length}` : 'Новых заявок нет'); }
+  try { inbox = await Store.inbox(); if (!document.getElementById('page') && tab !== 'music') render(); if (loud) toast(inbox.requests.length ? `Новых заявок: ${inbox.requests.length}` : 'Новых заявок нет'); }
   catch (e) { if (loud) toast(e.message); }
 }
 setInterval(() => { if (document.visibilityState === 'visible' && db) refreshInbox(false); }, 60000);

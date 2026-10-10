@@ -20,13 +20,13 @@ const Store = BF.Store = {
 };
 const sb = Store.mode === 'cloud' ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { auth: { persistSession: true, autoRefreshToken: true } }) : null;
 
-const ERR = { 'invite not found': 'Ссылка-приглашение устарела. Попросите у преподавателя новую.', 'bad name': 'Напишите имя и фамилию', 'too many': 'Слишком много заявок подряд. Дождитесь, пока преподаватель разберёт прежние.', 'not found': 'Ссылка устарела. Попросите у преподавателя новую.', 'bad photo': 'Фото слишком большое, попробуйте другое', 'bad date': 'Можно отметить только ближайшие занятия' };
+const ERR = { 'bad text': 'Сообщение пустое или слишком длинное', 'invite not found': 'Ссылка-приглашение устарела. Попросите у преподавателя новую.', 'bad name': 'Напишите имя и фамилию', 'too many': 'Слишком много заявок подряд. Дождитесь, пока преподаватель разберёт прежние.', 'not found': 'Ссылка устарела. Попросите у преподавателя новую.', 'bad photo': 'Фото слишком большое, попробуйте другое', 'bad date': 'Можно отметить только ближайшие занятия' };
 const nice = e => { const m = (e && e.message) || ''; const k = Object.keys(ERR).find(k => m.includes(k)); return new Error(k ? ERR[k] : /fetch|network/i.test(m) ? 'Нет связи с сервером. Проверьте интернет.' : m || 'Что-то пошло не так'); };
 const rpc = async (fn, args) => { const { data, error } = await sb.rpc(fn, args); if (error) throw nice(error); return data; };
 
 /* ======================= демо-«сервер» в браузере ======================= */
 const demo = {
-  extra() { return read(EXTRA_KEY) || { requests: [], days: {}, intents: [], invite: 'demo' + BF.token().slice(0, 8) }; },
+  extra() { const x = read(EXTRA_KEY) || { requests: [], days: {}, intents: [], invite: 'demo' + BF.token().slice(0, 8) }; x.chat = x.chat || []; return x; },
   putExtra(x) { write(EXTRA_KEY, x); },
   studio() { return BF.normalize(read(LOCAL_KEY)); },
   find(tok) { const d = demo.studio(); return d.students.find(s => s.token === tok) || null; },
@@ -117,19 +117,36 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 Store.inbox = async () => {
   if (!sb) {
     const x = demo.extra();
-    return { requests: x.requests.filter(r => r.status === 'new').map(r => ({ ...r, hasPhoto: !!r.photo, photo: undefined })), days: x.days, intents: x.intents.filter(i => i.date >= BF.addDays(BF.today(), -7)) };
+    return { requests: x.requests.filter(r => r.status === 'new').map(r => ({ ...r, hasPhoto: !!r.photo, photo: undefined })), days: x.days, intents: x.intents.filter(i => i.date >= BF.addDays(BF.today(), -7)), unread: x.chat.filter(m => !m.fromTeacher && !m.read) };
   }
-  const [r, d, i] = await Promise.all([
+  const [r, d, i, u] = await Promise.all([
     sb.from('requests').select('id, student_id, token, kind, payload, status, created_at, has_photo').eq('status', 'new').order('created_at'),
     sb.from('student_days').select('student_id, class_ids'),
     sb.from('intents').select('student_id, date, class_id, kind').gte('date', BF.addDays(BF.today(), -7)),
+    sb.from('chat').select('id, student_id, text, created_at').eq('from_teacher', false).is('read_at', null).order('created_at'),
   ]);
-  if (r.error || d.error || i.error) throw nice(r.error || d.error || i.error);
+  if (r.error || d.error || i.error || u.error) throw nice(r.error || d.error || i.error || u.error);
   return {
     requests: r.data.map(x => ({ id: x.id, studentId: x.student_id, token: x.token, kind: x.kind, payload: x.payload, createdAt: x.created_at, hasPhoto: !!x.has_photo })),
     days: Object.fromEntries(d.data.map(x => [x.student_id, x.class_ids])),
     intents: i.data.map(x => ({ studentId: x.student_id, date: x.date, classId: x.class_id, kind: x.kind })),
+    unread: u.data.map(x => ({ id: x.id, studentId: x.student_id, text: x.text, at: x.created_at })),
   };
+};
+// Переписка с одной ученицей; открытие помечает её сообщения прочитанными.
+Store.thread = async sid => {
+  if (!sb) { const x = demo.extra(); let ch = false; x.chat.forEach(m => { if (m.studentId === sid && !m.fromTeacher && !m.read) { m.read = true; ch = true; } }); if (ch) demo.putExtra(x); return x.chat.filter(m => m.studentId === sid).slice(-60); }
+  const { data, error } = await sb.from('chat').select('id, from_teacher, text, created_at, read_at').eq('student_id', sid).order('created_at', { ascending: false }).limit(60);
+  if (error) throw nice(error);
+  const ids = data.filter(m => !m.from_teacher && !m.read_at).map(m => m.id);
+  if (ids.length) await sb.from('chat').update({ read_at: new Date().toISOString() }).in('id', ids);
+  return data.reverse().map(m => ({ id: m.id, fromTeacher: m.from_teacher, text: m.text, at: m.created_at, read: !!m.read_at }));
+};
+Store.sendTo = async (sid, text) => {
+  if (!sb) { const x = demo.extra(); x.chat.push({ id: BF.uid(), studentId: sid, fromTeacher: true, text, at: new Date().toISOString(), read: false }); demo.putExtra(x); return; }
+  const { data: u } = await sb.auth.getUser();
+  const { error } = await sb.from('chat').insert({ owner: u.user.id, student_id: sid, from_teacher: true, text });
+  if (error) throw nice(error);
 };
 Store.photo = async id => {
   if (!sb) return demo.extra().requests.find(r => r.id === id)?.photo || null;
@@ -170,8 +187,14 @@ Store.card = async tok => {
     settings: (({ soonLessons, soonDays, priceSingle, pricePerLesson, plans, payInfo }) => ({ soonLessons, soonDays, priceSingle, pricePerLesson, plans, payInfo }))(d.settings),
     days: x.days[s.id] || [],
     intents: x.intents.filter(i => i.studentId === s.id && i.date >= t).map(({ date, classId, kind }) => ({ date, classId, kind })),
+    chat: (() => { let ch = false; x.chat.forEach(m => { if (m.studentId === s.id && m.fromTeacher && !m.read) { m.read = true; ch = true; } }); if (ch) demo.putExtra(x); return x.chat.filter(m => m.studentId === s.id).slice(-60).map(({ id, fromTeacher, text, at, read }) => ({ id, fromTeacher, text, at, read })); })(),
     requests: x.requests.filter(r => r.studentId === s.id).reverse().map(r => ({ id: r.id, kind: r.kind, payload: r.payload, status: r.status, createdAt: r.createdAt, hasPhoto: !!r.photo })),
   };
+};
+Store.say = async (tok, text) => {
+  if (sb) return rpc('student_message', { p_token: tok, p_text: text });
+  const s = demo.find(tok); if (!s) throw new Error(ERR['not found']);
+  const x = demo.extra(); x.chat.push({ id: BF.uid(), studentId: s.id, fromTeacher: false, text, at: new Date().toISOString(), read: false }); demo.putExtra(x);
 };
 Store.join = async (invite, name) => {
   if (sb) return rpc('join_studio', { p_invite: invite, p_name: name });
