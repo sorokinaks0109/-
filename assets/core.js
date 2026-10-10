@@ -71,7 +71,8 @@ BF.calc = db => {
   C.passEnd = p => addDays(p.start, p.weeks * 7 - 1 + C.frozenDays(p) + C.extraDays(p));
   C.unpaid = p => p.paid === false;
   C.cancelOf = (date, classId) => (db.cancels || []).find(c => c.date === date && c.classId === classId) || null;
-  C.passUsed = p => db.visits.filter(v => v.passId === p.id).length;
+  // carried: сколько занятий уже было использовано до переноса абонемента в приложение
+  C.passUsed = p => db.visits.filter(v => v.passId === p.id).length + (p.carried || 0);
   C.passLeft = p => p.total - C.passUsed(p);
   C.isFrozenOn = (p, d) => (p.freezes || []).some(f => d >= f.from && d <= f.to);
   C.passState = (p, on = today()) => {
@@ -92,7 +93,7 @@ BF.calc = db => {
   C.passForVisit = (sid, date, exceptVisitIds = []) => db.passes
     .filter(p => p.studentId === sid && date >= p.start && date <= C.passEnd(p))
     .sort((a, b) => a.start < b.start ? -1 : 1)
-    .find(p => p.total - db.visits.filter(v => v.passId === p.id && !exceptVisitIds.includes(v.id)).length > 0) || null;
+    .find(p => p.total - (p.carried || 0) - db.visits.filter(v => v.passId === p.id && !exceptVisitIds.includes(v.id)).length > 0) || null;
   C.studentById = id => db.students.find(s => s.id === id);
   C.classById = id => db.schedule.find(c => c.id === id);
   C.classesFor = date => db.schedule.filter(c => c.dow === parse(date).getDay()).sort((a, b) => a.start < b.start ? -1 : 1);

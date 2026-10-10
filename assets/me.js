@@ -94,7 +94,7 @@ function draw() {
   if (st && st.key === 'expired') note = `<div class="note bad">Срок абонемента вышел ${fmt(st.end)}. Неиспользованные занятия сгорели: ${st.burned}.</div>`;
   if (st && st.key === 'frozen') { const f = p.freezes.find(f => t >= f.from && t <= f.to); note = `<div class="note">Абонемент заморожен до ${fmt(f.to)}, срок продлён на эти дни.</div>`; }
 
-  const reqText = r => r.kind === 'payment' ? `Оплата: ${raz(r.payload.perWeek)} в неделю, ${rub(r.payload.price)}, ${METHODS[r.payload.method] || ''}` : `Пропуск: ${REASONS[r.payload.reason] || ''}, ${fmt(r.payload.from)} – ${fmt(r.payload.to)}`;
+  const reqText = r => r.kind === 'payment' && r.payload.existing ? `Перенос абонемента: ${raz(r.payload.perWeek)} в неделю, осталось ${zan(Number(r.payload.left) || 0)}` : r.kind === 'payment' ? `Оплата: ${raz(r.payload.perWeek)} в неделю, ${rub(r.payload.price)}, ${METHODS[r.payload.method] || ''}` : `Пропуск: ${REASONS[r.payload.reason] || ''}, ${fmt(r.payload.from)} – ${fmt(r.payload.to)}`;
 
   root.innerHTML = `
   ${hero(s.name, 'Ballet Forever · мой абонемент')}
@@ -114,6 +114,7 @@ function draw() {
   ${decided.filter(r => diff(String(r.createdAt).slice(0, 10), t) <= 7).map(r => `<div class="note ${r.status === 'approved' ? 'ok' : 'bad'}">${r.status === 'approved' ? 'Подтверждено' : 'Отклонено'}: ${esc(reqText(r))}.</div>`).join('')}
   <div class="actions">
     <button class="btn primary" data-act="pay">${p && (C.isLive(st) || st.key === 'future') ? 'Продлить абонемент' : 'Купить абонемент'}</button>
+    ${!p || !(C.isLive(st) || st.key === 'future') ? '<button class="btn" data-act="pay-existing">У меня уже есть абонемент</button>' : ''}
     <button class="btn" data-act="freeze">Пропущу по уважительной причине</button>
   </div>
   <section><div class="sec-title"><h2>Ближайшие занятия</h2></div>
@@ -151,35 +152,58 @@ function installBlock() {
 }
 
 /* ---------- оплата ---------- */
-function payPage() {
-  const plans = card.settings.plans || [];
-  const prev = C.studentPasses(card.student.id)[0];
+function payPage(mode = 'new') {
+  const plans = card.settings.plans || [], t = today();
+  const prev = C.studentPasses(card.student.id)[0], prevSt = prev ? C.passState(prev) : null;
   let planId = (prev && plans.find(p => p.perWeek === prev.perWeek && p.weeks === prev.weeks)?.id) || plans[1]?.id || plans[0]?.id;
   let method = 'transfer';
-  ui.page(`<div class="form">
-      <p>Выберите абонемент и как оплатили. Преподаватель проверит и подтвердит.</p>
-      <div class="plan-cards" id="plans">${plans.map(p => `<button type="button" class="plan" data-id="${p.id}" aria-pressed="${p.id === planId}"><b>${BF.planTitle(p)}</b><span>${BF.planSub(p)}</span><em>${rub(p.price)}</em></button>`).join('')}</div>
-      <div class="f">Как оплатили<div class="seg" id="method"><button type="button" data-m="transfer" aria-pressed="true">Переводом</button><button type="button" data-m="cash" aria-pressed="false">Наличными</button></div></div>
-      <div id="payInfo"></div>
-      <button class="btn primary" data-act="send-pay">Отправить</button>
-    </div>`, {
-    title: 'Оплата абонемента',
-    onMount: el => {
-      const info = () => { el.querySelector('#payInfo').innerHTML = method === 'transfer'
-        ? (card.settings.payInfo ? `<div class="msg">${esc(card.settings.payInfo)}</div><button class="btn small" type="button" data-act="copy-pay">Скопировать</button>` : '<p class="hint">Реквизиты для перевода уточните у преподавателя.</p>')
-        : '<p class="hint">Передайте деньги на ближайшем занятии. Абонемент начнёт действовать, когда преподаватель подтвердит оплату.</p>'; };
-      el.querySelector('#plans').addEventListener('click', e => { const b = e.target.closest('.plan'); if (!b) return; planId = b.dataset.id; el.querySelectorAll('.plan').forEach(x => x.setAttribute('aria-pressed', x === b)); });
-      el.querySelector('#method').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; method = b.dataset.m; el.querySelectorAll('#method button').forEach(x => x.setAttribute('aria-pressed', x === b)); info(); });
-      info();
-    },
+  const days = new Set(card.days || []);
+  const startNew = prev && prevSt && C.isLive(prevSt) ? addDays(prevSt.end, 1) : t;
+  const draw = el => {
+    const plan = plans.find(x => x.id === planId), total = plan ? plan.perWeek * plan.weeks : 0;
+    const keep = id => el.querySelector(id)?.value;
+    const startV = keep('#pStart') || (mode === 'new' ? startNew : addDays(t, -7)), leftV = keep('#pLeft') || total;
+    el.innerHTML = `<div class="form">
+      <div class="seg"><button type="button" data-act="mode" data-k="new" aria-pressed="${mode === 'new'}">Новый абонемент</button><button type="button" data-act="mode" data-k="existing" aria-pressed="${mode === 'existing'}">Уже есть</button></div>
+      <p>${mode === 'new' ? 'Выберите абонемент, дату начала и как оплатили. Преподаватель проверит оплату и подтвердит.' : 'Если абонемент куплен раньше и записан в тетрадке, перенесите его сюда: преподаватель сверит и подтвердит.'}</p>
+      <div class="plan-cards">${plans.map(p => `<button type="button" class="plan" data-act="plan" data-id="${p.id}" aria-pressed="${p.id === planId}"><b>${BF.planTitle(p)}</b><span>${BF.planSub(p)}</span>${mode === 'new' ? `<em>${rub(p.price)}</em>` : ''}</button>`).join('')}</div>
+      <div class="grid2">
+        <label class="f">${mode === 'new' ? 'Начать с' : 'Действует с'}<input type="date" id="pStart" value="${startV}" min="${addDays(t, -60)}" max="${addDays(t, 60)}"></label>
+        ${mode === 'existing' ? `<label class="f">Сколько занятий осталось<input type="number" inputmode="numeric" id="pLeft" min="1" max="${total}" value="${Math.min(Number(leftV) || total, total)}"></label>` : '<div></div>'}
+      </div>
+      <div class="f">Мои дни<div class="chips">${C.sortedSchedule().map(c => `<button type="button" class="chip" data-act="pday" data-id="${c.id}" aria-pressed="${days.has(c.id)}">${DOW[c.dow]} · ${esc(c.title)}</button>`).join('')}</div></div>
+      ${mode === 'new' ? `<div class="f">Как оплатили<div class="seg"><button type="button" data-act="method" data-k="transfer" aria-pressed="${method === 'transfer'}">Переводом</button><button type="button" data-act="method" data-k="cash" aria-pressed="${method === 'cash'}">Наличными</button></div></div>
+        ${method === 'transfer' ? (card.settings.payInfo ? `<div class="msg">${esc(card.settings.payInfo)}</div><button class="btn small" type="button" data-act="copy-pay">Скопировать реквизиты</button>` : '<p class="hint">Реквизиты для перевода уточните у преподавателя.</p>') : '<p class="hint">Передайте деньги на ближайшем занятии.</p>'}` : ''}
+      <button class="btn primary" data-act="send-pay">Отправить преподавателю</button>
+    </div>`;
+  };
+  ui.page('', {
+    title: 'Абонемент', onMount: draw,
     onAction: async e => {
       const a = e.target.closest('[data-act]'); if (!a) return;
-      if (a.dataset.act === 'copy-pay') ui.copy(card.settings.payInfo, 'Скопировано');
-      if (a.dataset.act === 'send-pay') {
+      const el = document.querySelector('#page .page-body');
+      const act = a.dataset.act;
+      if (act === 'mode') { mode = a.dataset.k; el.querySelector('#pStart').value = ''; draw(el); }
+      if (act === 'plan') { planId = a.dataset.id; draw(el); }
+      if (act === 'method') { method = a.dataset.k; draw(el); }
+      if (act === 'pday') { days.has(a.dataset.id) ? days.delete(a.dataset.id) : days.add(a.dataset.id); draw(el); }
+      if (act === 'copy-pay') ui.copy(card.settings.payInfo, 'Скопировано');
+      if (act === 'send-pay') {
         const p = plans.find(x => x.id === planId); if (!p) return;
+        const start = el.querySelector('#pStart').value || t, total = p.perWeek * p.weeks;
+        const payload = { planId: p.id, perWeek: p.perWeek, weeks: p.weeks, price: p.price, start };
+        if (mode === 'existing') {
+          const left = Number(el.querySelector('#pLeft').value);
+          if (!(left >= 1 && left <= total)) { toast(`Укажите, сколько осталось: от 1 до ${total}`); return; }
+          if (start > t) { toast('Дата начала уже действующего абонемента не может быть в будущем'); return; }
+          Object.assign(payload, { existing: true, left });
+        } else payload.method = method;
         a.disabled = true;
-        try { await Store.request(tok, 'payment', { planId: p.id, perWeek: p.perWeek, weeks: p.weeks, price: p.price, method }, null); ui.closePage(); toast('Отправлено преподавателю'); show(true); }
-        catch (x) { toast(x.message); a.disabled = false; }
+        try {
+          await Store.request(tok, 'payment', payload, null);
+          const list = [...days]; if (list.join() !== (card.days || []).join()) { await Store.setDays(tok, list); card.days = list; }
+          ui.closePage(); toast('Отправлено преподавателю'); show(true);
+        } catch (x) { toast(x.message); a.disabled = false; }
       }
     },
   });
@@ -258,6 +282,7 @@ root.addEventListener('click', async e => {
     if (act === 'reload') show();
     if (act === 'pay') payPage();
     if (act === 'pay-owed') payOwedPage();
+    if (act === 'pay-existing') payPage('existing');
     if (act === 'freeze') freezePage();
     if (act === 'install' && installEvt) { installEvt.prompt(); await installEvt.userChoice; installEvt = null; a.hidden = true; }
     if (act === 'cancel-req') { await Store.cancelRequest(tok, a.dataset.id); toast('Заявка отменена'); show(true); }

@@ -200,7 +200,7 @@ begin
       select jsonb_agg(jsonb_build_object(
         'id', p -> 'id', 'studentId', p -> 'studentId', 'perWeek', p -> 'perWeek', 'weeks', p -> 'weeks',
         'total', p -> 'total', 'start', p -> 'start', 'freezes', coalesce(p -> 'freezes', '[]'::jsonb),
-        'extensions', coalesce(p -> 'extensions', '[]'::jsonb), 'paid', p -> 'paid', 'price', p -> 'price'))
+        'extensions', coalesce(p -> 'extensions', '[]'::jsonb), 'paid', p -> 'paid', 'price', p -> 'price', 'carried', p -> 'carried'))
         from jsonb_array_elements(d -> 'passes') p where p ->> 'studentId' = sid), '[]'::jsonb),
     'visits', coalesce((
       select jsonb_agg(jsonb_build_object('date', v -> 'date', 'classId', v -> 'classId', 'kind', v -> 'kind', 'passId', v -> 'passId'))
