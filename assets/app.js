@@ -2,7 +2,7 @@
 (() => {
 'use strict';
 const BF = window.BF, Store = BF.Store, ui = BF.ui;
-const { today, addDays, diff, parse, weekStart, fmt, fmtDow, plural, zan, raz, rub, uid, token, esc, initials, firstName, pad, DOW, DOW_FULL, MONTHS, MONTHS_NOM, REASONS, METHODS } = BF;
+const { today, addDays, diff, parse, weekStart, fmt, fmtDow, plural, zan, raz, rub, uid, token, esc, initials, firstName, callName, pad, DOW, DOW_FULL, MONTHS, MONTHS_NOM, REASONS, METHODS } = BF;
 const BASE = new URL('./', location.href).href;
 
 let db, C, inbox = { requests: [], days: {}, intents: [] };
@@ -116,7 +116,7 @@ function renderWeek() {
       <div class="cls-who">
         <div class="eyebrow">${marked ? `Пришли: ${visits.length}` : `Собираются: ${exp.coming.length}`}</div>
         ${names.length ? `<div class="names">${names.map(n => `<span>${esc(n)}</span>`).join('')}</div>` : `<p class="hint">${marked ? '' : 'Никто не отметил этот день постоянным.'}</p>`}
-        ${!marked && exp.skipping.length ? `<p class="hint">Не придут: ${exp.skipping.map(s => esc(firstName(s.name))).join(', ')}</p>` : ''}
+        ${!marked && exp.skipping.length ? `<p class="hint">Не придут: ${exp.skipping.map(s => esc(callName(s))).join(', ')}</p>` : ''}
       </div>
       <button class="btn ${past && !marked ? 'primary' : ''} block" data-act="mark" data-date="${selDate}" data-class="${cls.id}">${marked ? 'Изменить отметку' : 'Отметить, кто пришёл'}</button>
       ${!marked && !past ? `<div class="btns"><button class="btn small" data-act="cancel-class" data-date="${selDate}" data-class="${cls.id}">Отменить занятие</button><button class="btn small" data-act="message" data-date="${selDate}" data-class="${cls.id}">Написать тем, кто придёт</button></div>` : ''}
@@ -554,6 +554,7 @@ function studentForm(id, after) {
   const s = id ? C.studentById(id) : { name: '', phone: '', remind: true, note: '' };
   ui.page(`<form class="form" id="stForm">
       <label class="f">Имя и фамилия<input type="text" id="fName" value="${esc(s.name)}" required autocomplete="off"></label>
+      <label class="f">Как обращаться в сообщениях<input type="text" id="fCall" value="${esc(s.callName || '')}" placeholder="${esc(s.name ? callName({ name: s.name }) : 'Ксения')}" autocomplete="off"></label>
       <label class="f">Телефон, если нужен<input type="tel" id="fPhone" value="${esc(s.phone)}" placeholder="+7"></label>
       <label class="switch">Напоминать о конце абонемента<input type="checkbox" id="fRemind" ${s.remind ? 'checked' : ''}></label>
       <label class="f">Заметка<input type="text" id="fNote" value="${esc(s.note)}"></label>
@@ -566,7 +567,7 @@ function studentForm(id, after) {
       el.querySelector('#stForm').addEventListener('submit', e => {
         e.preventDefault();
         const name = el.querySelector('#fName').value.trim(); if (!name) return;
-        const data = { name, phone: el.querySelector('#fPhone').value.trim(), remind: el.querySelector('#fRemind').checked, note: el.querySelector('#fNote').value.trim() };
+        const data = { name, callName: el.querySelector('#fCall').value.trim(), phone: el.querySelector('#fPhone').value.trim(), remind: el.querySelector('#fRemind').checked, note: el.querySelector('#fNote').value.trim() };
         let sid = id;
         if (id) Object.assign(C.studentById(id), data); else { sid = uid(); db.students.push({ id: sid, token: token(), ...data }); }
         save(); ui.closePage(); render(); toast('Сохранено');
@@ -654,6 +655,28 @@ function freezeForm(passId) {
   });
 }
 
+function remindPage(sid) {
+  const s = C.studentById(sid), p = C.currentPass(sid), st = p ? C.passState(p) : null;
+  const text = db.settings.template.replaceAll('{имя}', callName(s)).replaceAll('{осталось}', st ? zan(st.left) : '').replaceAll('{до}', st ? fmt(st.end) : '').replaceAll('{ссылка}', studentLink(s));
+  ui.page(`<p class="hint">Для ${esc(s.name)}. Текст можно поправить.</p>
+    <label class="f">Сообщение<textarea id="rText" rows="6">${esc(text)}</textarea></label>
+    <div class="f">Куда отправить</div>
+    <button class="btn primary block" data-act="r-app">В приложение</button>
+    <p class="hint">Появится вверху её страницы в Ballet Forever.</p>
+    ${navigator.share ? '<button class="btn block" data-act="r-max">В Макс…</button>' : ''}
+    <button class="btn block" data-act="r-copy">Скопировать текст</button>
+    <p class="hint">Если у ученицы нет приложения, отправьте в Макс: откроется список приложений, выберите Макс и её чат.</p>`, {
+    title: 'Напоминание',
+    onAction: e => {
+      const a = e.target.closest('[data-act]'); if (!a) return;
+      const t = document.getElementById('rText').value.trim(); if (!t) { toast('Текст пустой'); return; }
+      if (a.dataset.act === 'r-app') { addMessage(t, [sid]); save(); toast('Отправлено в приложение'); a.disabled = true; a.textContent = 'Отправлено в приложение'; }
+      if (a.dataset.act === 'r-max') navigator.share({ text: t }).catch(() => {});
+      if (a.dataset.act === 'r-copy') ui.copy(t, 'Текст скопирован');
+    },
+  });
+}
+
 let shareText = '';
 function sharePage(title, hint, text) {
   shareText = text;
@@ -729,9 +752,8 @@ async function onAction(e, redraw) {
       const list = [...cur]; inbox.days[sid] = list; redraw && redraw(); render();
       Store.setDaysFor(sid, list).catch(err => toast(err.message)); break;
     }
-    case 'send-link': { const s = C.studentById(id); sharePage('Ссылка для ученицы', `Личная ссылка ${esc(s.name)}. По ней видно только её абонемент.`, `${firstName(s.name)}, это твоё приложение Ballet Forever: остаток занятий, твои дни, оплата и пропуски.\n${studentLink(s)}\nОткрой ссылку и добавь страницу на главный экран телефона.`); break; }
-    case 'remind': { const s = C.studentById(id), p = C.currentPass(id), st = C.passState(p);
-      sharePage('Напоминание', `Для ${esc(s.name)}.`, db.settings.template.replaceAll('{имя}', firstName(s.name)).replaceAll('{осталось}', zan(st.left)).replaceAll('{до}', fmt(st.end)).replaceAll('{ссылка}', studentLink(s))); break; }
+    case 'send-link': { const s = C.studentById(id); sharePage('Ссылка для ученицы', `Личная ссылка ${esc(s.name)}. По ней видно только её абонемент.`, `${callName(s)}, это твоё приложение Ballet Forever: остаток занятий, твои дни, оплата и пропуски.\n${studentLink(s)}\nОткрой ссылку и добавь страницу на главный экран телефона.`); break; }
+    case 'remind': remindPage(id); break;
     case 'invite': sharePage('Пригласить учениц', 'Отправьте это сообщение в общую группу в Максе. Каждая откроет ссылку, напишет имя, и заявка придёт вам в «Заявки».', `Девочки, у нас теперь своё приложение Ballet Forever: видно, сколько занятий осталось в абонементе, можно отметить свои дни, сообщить об оплате или пропуске.\nОткройте ссылку и напишите имя и фамилию:\n${inviteLink()}`); break;
     case 'new-invite': confirmPage('Сделать новую ссылку?', 'Старая ссылка-приглашение перестанет работать. Личные ссылки учениц не изменятся.', 'Сделать', async () => { try { await Store.newInvite(); render(); toast('Новая ссылка готова'); } catch (err) { toast(err.message); } }); break;
     case 'copy-text': ui.copy(shareText, 'Текст скопирован'); break;

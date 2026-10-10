@@ -26,8 +26,11 @@ const token = () => { const a = new Uint8Array(15); crypto.getRandomValues(a); r
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const initials = name => String(name || '').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
 const firstName = name => String(name || '').trim().split(/\s+/)[0] || name;
+// Как обращаться к ученице: своё поле, иначе имя из «Имя Фамилия» или «Фамилия Имя»
+const SURNAME = /(ова|ева|ёва|ина|ына|ская|цкая|ко|ук|юк|ян|дзе|швили)$/i;
+const callName = s => { if (s && s.callName && s.callName.trim()) return s.callName.trim(); const w = String((s && s.name) || '').trim().split(/\s+/); return w.length > 1 && SURNAME.test(w[0]) && !SURNAME.test(w[1]) ? w[1] : w[0]; };
 
-Object.assign(BF, { pad, iso, parse, today, addDays, diff, weekStart, MONTHS, MONTHS_NOM, DOW, DOW_FULL, fmt, fmtDow, plural, zan, raz, rub, uid, token, esc, initials, firstName });
+Object.assign(BF, { pad, iso, parse, today, addDays, diff, weekStart, MONTHS, MONTHS_NOM, DOW, DOW_FULL, fmt, fmtDow, plural, zan, raz, rub, uid, token, esc, initials, firstName, callName });
 
 BF.REASONS = { sick: 'Болезнь', trip: 'Командировка', vacation: 'Отпуск', other: 'Другое' };
 BF.METHODS = { transfer: 'переводом', cash: 'наличными на занятии' };
