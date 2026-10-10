@@ -27,7 +27,7 @@ function renderJoin() {
   root.innerHTML = `${hero('Ballet Forever', 'запись в группу')}
     <form class="form" id="joinForm">
       <p>Напишите имя и фамилию. Преподаватель подтвердит заявку, и здесь появится ваш абонемент и расписание.</p>
-      <label class="f">Имя и фамилия<input type="text" id="jName" autocomplete="name" required minlength="2" maxlength="60"></label>
+      <label class="f">Имя и фамилия, например: Ксения Сорокина<input type="text" id="jName" autocomplete="name" required minlength="2" maxlength="60"></label>
       <p class="err" id="jErr" hidden></p>
       <button class="btn primary" type="submit">Отправить заявку</button>
     </form>`;
@@ -67,7 +67,7 @@ async function show(quiet) {
     card = cached; toast('Нет интернета, показаны сохранённые данные');
   }
   if (card.pending) {
-    root.innerHTML = `${hero(firstName(card.name), 'заявка отправлена')}
+    root.innerHTML = `${hero(card.name, 'заявка отправлена')}
       <p>Преподаватель скоро подтвердит заявку. После этого здесь появятся абонемент, расписание и кнопки оплаты.</p>
       <button class="btn" data-act="reload">Проверить</button>${installBlock()}`;
     return;
@@ -97,7 +97,7 @@ function draw() {
   const reqText = r => r.kind === 'payment' ? `Оплата: ${raz(r.payload.perWeek)} в неделю, ${rub(r.payload.price)}, ${METHODS[r.payload.method] || ''}` : `Пропуск: ${REASONS[r.payload.reason] || ''}, ${fmt(r.payload.from)} – ${fmt(r.payload.to)}`;
 
   root.innerHTML = `
-  ${hero(firstName(s.name), 'Ballet Forever · мой абонемент')}
+  ${hero(s.name, 'Ballet Forever · мой абонемент')}
   ${p ? `<section class="card ticket">
     <div class="eyebrow">${st.key === 'future' ? `Абонемент с ${fmt(p.start)}` : 'Осталось занятий'}</div>
     <div class="big"><b>${st.key === 'expired' ? 0 : st.left}</b><span>из ${p.total}</span></div>
@@ -123,12 +123,12 @@ function draw() {
       const it = intents.find(i => i.date === u.date && i.classId === u.cls.id);
       const regular = days.includes(u.cls.id);
       const going = (regular && !(it && it.kind === 'skip')) || (it && it.kind === 'extra');
-      const label = going ? (it && it.kind === 'extra' ? 'Приду, доп.' : 'Иду') : (regular ? 'Не приду' : 'Не записана');
+      const label = going ? 'Иду' : 'Не иду';
       return `<div class="row up"><div class="day">${DOW[parse(u.date).getDay()]}</div>
         <div class="main"><div class="name">${esc(u.cls.title)}</div><div class="sub num">${fmt(u.date)}, ${u.cls.start}–${u.cls.end}</div></div>
         <button class="toggle ${going ? 'on' : ''}" data-act="intent" data-date="${u.date}" data-class="${u.cls.id}" aria-pressed="${going}">${label}</button></div>`;
     }).join('')}</div>
-    <p class="hint" style="margin-top:8px">Нажмите на отметку, чтобы поменять: «Иду» ⇄ «Не приду». Преподаватель видит, кто придёт.</p>
+    <p class="hint" style="margin-top:8px">Нажмите, чтобы поменять «Иду» на «Не иду» и обратно. Преподаватель видит, кто придёт.</p>
   </section>
   <section><div class="sec-title"><h2>Мои постоянные дни</h2></div>
     <div class="chips">${C.sortedSchedule().map(c => `<button class="chip" data-act="day" data-id="${c.id}" aria-pressed="${days.includes(c.id)}">${DOW[c.dow]} · ${esc(c.title)} · ${c.start}</button>`).join('')}</div>
@@ -276,7 +276,7 @@ root.addEventListener('click', async e => {
       if (kind) card.intents.push({ date, classId, kind });
       draw();
       await Store.setIntent(tok, date, classId, kind);
-      toast(kind === 'skip' ? 'Отметила: не приду' : kind === 'extra' ? 'Отметила: приду' : regular ? 'Отметила: иду' : 'Запись снята');
+      toast(kind === 'skip' || (!kind && !regular) ? 'Отмечено: не иду' : 'Отмечено: иду');
     }
   } catch (x) { toast(x.message); show(true); }
 });

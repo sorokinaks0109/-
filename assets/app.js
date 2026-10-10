@@ -110,7 +110,7 @@ function renderWeek() {
     const past = C.isPast(selDate, cls);
     const marked = visits.length > 0;
     const names = marked ? visits.map(v => C.studentById(v.studentId)?.name).filter(Boolean)
-      : exp.coming.map(x => x.s.name + (x.extra ? ' (доп.)' : ''));
+      : exp.coming.map(x => x.s.name);
     return `<article class="card cls">
       <div class="cls-head"><div class="cls-time disp">${cls.start}</div><div class="main"><h3>${esc(cls.title)}</h3><div class="hint num">${cls.start}–${cls.end}</div></div></div>
       <div class="cls-who">

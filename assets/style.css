@@ -163,7 +163,7 @@ textarea { min-height: 96px; resize: vertical; }
 /* страница ученицы */
 .me-hero { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 8px; padding-block: 22px 16px; border-bottom: 1px solid var(--ink); }
 .me-hero .ballerina { width: 120px; height: 120px; margin-bottom: -6px; }
-.me-hero h1 { font-family: var(--f-display); font-size: 34px; line-height: 1.05; overflow-wrap: anywhere; }
+.me-hero h1 { font-family: var(--f-display); font-size: 30px; line-height: 1.05; overflow-wrap: anywhere; }
 .me-hero p { margin: 8px 0 0; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .16em; }
 .big { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .big b { font-family: var(--f-display); font-weight: 400; font-size: 72px; line-height: .95; font-variant-numeric: lining-nums; }
