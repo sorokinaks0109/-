@@ -162,9 +162,11 @@ Store.card = async tok => {
   const d = demo.studio(), t = BF.today();
   return {
     student: { id: s.id, name: s.name },
-    passes: d.passes.filter(p => p.studentId === s.id).map(({ price, paidAt, ...p }) => p),
+    passes: d.passes.filter(p => p.studentId === s.id).map(({ paidAt, ...p }) => p),
     visits: d.visits.filter(v => v.studentId === s.id).map(v => ({ date: v.date, classId: v.classId, kind: v.kind, passId: v.passId })),
     schedule: d.schedule,
+    cancels: (d.cancels || []).filter(c => c.date >= BF.addDays(t, -1)),
+    messages: (d.messages || []).filter(m => (m.to === 'all' || (Array.isArray(m.to) && m.to.includes(s.id))) && m.date >= BF.addDays(t, -21)).sort((a, b) => a.date < b.date ? 1 : -1).map(({ id, text, date }) => ({ id, text, date })),
     settings: (({ soonLessons, soonDays, priceSingle, pricePerLesson, plans, payInfo }) => ({ soonLessons, soonDays, priceSingle, pricePerLesson, plans, payInfo }))(d.settings),
     days: x.days[s.id] || [],
     intents: x.intents.filter(i => i.studentId === s.id && i.date >= t).map(({ date, classId, kind }) => ({ date, classId, kind })),

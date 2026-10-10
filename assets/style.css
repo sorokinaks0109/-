@@ -255,3 +255,23 @@ img.doc { width: 100%; border: 1px solid var(--line); border-radius: var(--r); b
 .note .btn { min-height: 28px; padding: 0 6px; }
 .check-line { display: flex; gap: 10px; align-items: center; font-size: 14px; }
 .check-line input { width: 20px; height: 20px; }
+
+/* отмены, долги, сообщения, карточка ученицы */
+.cls.cancelled { opacity: .75; border-style: dashed; }
+.cls.cancelled h3 { text-decoration: line-through; }
+.wd i.off { border: 1px solid var(--bad); background: transparent; transform: rotate(45deg); border-radius: 1px; }
+.row.up.off .name { text-decoration: line-through; color: var(--muted); }
+.mark-item .seg.small { margin: 0 14px 12px 54px; }
+.seg.small button { min-height: 36px; font-size: 12px; padding: 0 4px; line-height: 1.2; }
+.who { display: flex; gap: 12px; align-items: center; }
+.who .main { flex: 1; min-width: 0; }
+.who h2 { font-size: 24px; overflow-wrap: anywhere; }
+.who .iconbtn { font-size: 20px; line-height: 1; }
+.status { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.status-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+.status .big b { font-size: 52px; }
+.debt-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.msgs { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--ink); border-radius: var(--r); }
+.msg-item p { margin: 2px 0 0; }
+.msg-item + .msg-item { padding-top: 8px; border-top: 1px dashed var(--line); }
+.btn.danger.block { border-color: var(--bad); }
