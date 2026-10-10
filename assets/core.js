@@ -127,6 +127,47 @@ BF.calc = db => {
   return C;
 };
 
+/* ---------- шкала и календарь абонемента ---------- */
+// Закрашено — занятия, на которых уже была; пустые кружки — сколько осталось.
+BF.meter = (C, p, st) => {
+  if (!p || p.total > 24) return '';
+  const used = p.total - st.left, burnt = st.key === 'expired';
+  return `<div class="meter" aria-hidden="true">${Array.from({ length: p.total }, (_, i) => `<i class="${i < used ? 'on' : burnt ? 'burn' : ''}"></i>`).join('')}</div>
+    <div class="meter-legend"><span><i class="on"></i>была: ${used}</span><span><i></i>${burnt ? `сгорело: ${st.left}` : `осталось: ${st.left}`}</span></div>`;
+};
+// Календарь абонемента по месяцам: была, пропуск, заморозка, отмена, впереди.
+BF.calendar = (C, db, sid, p, days, intents) => {
+  if (!p) return '';
+  const t = today(), end = C.passEnd(p);
+  const mine = d => C.classesFor(d).filter(c => {
+    const it = (intents || []).find(i => i.date === d && i.classId === c.id);
+    return (days.includes(c.id) && !(it && it.kind === 'skip')) || (it && it.kind === 'extra');
+  });
+  const state = d => {
+    if (d < p.start || d > end) return { k: 'out' };
+    const vis = db.visits.filter(v => v.studentId === sid && v.date === d);
+    if (vis.length) return { k: 'was', title: 'была' };
+    const cls = C.classesFor(d); if (!cls.length) return { k: '' };
+    if (cls.every(c => C.cancelOf(d, c.id))) return { k: 'off', title: 'занятие отменено' };
+    if (C.isFrozenOn(p, d)) return { k: 'frozen', title: 'заморозка' };
+    const my = mine(d);
+    if (d < t || (d === t && cls.every(c => C.isPast(d, c)))) return my.length ? { k: 'miss', title: 'пропуск' } : { k: 'cls' };
+    return my.length ? { k: 'go', title: 'собирается' } : { k: 'cls' };
+  };
+  const months = []; let m = p.start.slice(0, 7);
+  while (m <= end.slice(0, 7) && months.length < 4) { months.push(m); const [y, mm] = m.split('-').map(Number); const d = new Date(y, mm, 1); m = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
+  const grid = ym => {
+    const [y, mm] = ym.split('-').map(Number), first = `${ym}-01`, n = new Date(y, mm, 0).getDate(), lead = (parse(first).getDay() + 6) % 7;
+    const cells = Array.from({ length: lead }, () => '<span></span>').concat(Array.from({ length: n }, (_, i) => {
+      const d = `${ym}-${pad(i + 1)}`, st = state(d);
+      return `<span class="cd ${st.k} ${d === t ? 'now' : ''}" ${st.title ? `title="${st.title}"` : ''}>${i + 1}</span>`;
+    }));
+    return `<div class="cal-month"><div class="cal-title">${MONTHS_NOM[mm - 1]}</div><div class="cal-grid">${['пн','вт','ср','чт','пт','сб','вс'].map(x => `<b>${x}</b>`).join('')}${cells.join('')}</div></div>`;
+  };
+  return `<div class="cal">${months.map(grid).join('')}
+    <div class="cal-legend"><span><i class="cd was"></i>была</span><span><i class="cd miss"></i>пропуск</span><span><i class="cd go"></i>впереди</span><span><i class="cd frozen"></i>заморозка</span><span><i class="cd off"></i>отмена</span></div></div>`;
+};
+
 /* ---------- рисунок ---------- */
 BF.ballerina = '';
 BF.loadBallerina = async base => {
