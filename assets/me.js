@@ -27,7 +27,7 @@ function renderJoin() {
   root.innerHTML = `${hero('Ballet Forever', 'запись в группу')}
     <form class="form" id="joinForm">
       <p>Напишите имя и фамилию. Преподаватель подтвердит заявку, и здесь появится ваш абонемент и расписание.</p>
-      <label class="f">Имя и фамилия, например: Ксения Сорокина<input type="text" id="jName" autocomplete="name" required minlength="2" maxlength="60"></label>
+      <div class="grid2"><label class="f">Имя<input type="text" id="jFirst" autocomplete="given-name" required maxlength="30"></label><label class="f">Фамилия<input type="text" id="jLast" autocomplete="family-name" required maxlength="30"></label></div>
       <p class="err" id="jErr" hidden></p>
       <button class="btn primary" type="submit">Отправить заявку</button>
     </form>`;
@@ -36,7 +36,7 @@ function renderJoin() {
     const btn = e.target.querySelector('button'), err = document.getElementById('jErr');
     btn.disabled = true; err.hidden = true;
     try {
-      tok = await Store.join(joinCode, document.getElementById('jName').value);
+      tok = await Store.join(joinCode, `${document.getElementById('jFirst').value.trim()} ${document.getElementById('jLast').value.trim()}`);
       try { localStorage.setItem(KEY, tok); } catch (_) {}
       history.replaceState(null, '', location.pathname + '?t=' + tok);
       show();
