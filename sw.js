@@ -7,6 +7,9 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   // no-cache: всегда спрашиваем сервер, не изменились ли файлы, чтобы обновления приходили сразу
-  e.respondWith(fetch(e.request.url, { cache: 'no-cache' }).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r; })
+  e.respondWith(fetch(e.request.url, { cache: 'no-cache' }).then(r => {
+    if (r.redirected) return Response.redirect(r.url, 302);
+    const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r;
+  })
     .catch(() => caches.match(e.request, { ignoreSearch: true })));
 });
