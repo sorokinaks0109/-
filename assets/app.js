@@ -601,7 +601,7 @@ function payForm(sid) {
         const p = plans.find(x => x.id === planId); $('#pPrice').value = p.price;
         const s = $('#pStart').value || t, sg = singlesFrom(s), old = $('#pOld').checked, total = p.perWeek * p.weeks;
         $('#pLeftLine').hidden = !old; $('#pPaidLine').hidden = old;
-        $('#pLeft').max = total; if (!$('#pLeft').value || Number($('#pLeft').value) > total) $('#pLeft').value = total;
+        $('#pLeft').max = total;
         if (old && $('#pStart').value === t && !$('#pStart').dataset.touched) $('#pStart').value = addDays(t, -7);
         $('#pConvLine').hidden = old || !sg.length;
         $('#pConvText').textContent = `Засчитать в абонемент разовые с ${fmt(s)}: ${sg.length}`;
@@ -611,12 +611,16 @@ function payForm(sid) {
           : `<b>${zan(total)}</b>, действует <b>с ${fmt(st0)} по ${fmt(addDays(st0, p.weeks * 7 - 1))}</b>.${$('#pPaid').checked ? '' : ' Будет в списке «Не оплачено», пока не отметите оплату.'}`;
       };
       $('#pPlans').addEventListener('click', e => { const b = e.target.closest('.plan'); if (!b) return; planId = b.dataset.id; $('#pPlans').querySelectorAll('.plan').forEach(x => x.setAttribute('aria-pressed', x === b)); upd(); });
-      $('#pStart').addEventListener('change', () => { $('#pStart').dataset.touched = '1'; upd(); }); $('#pPaid').addEventListener('change', upd); $('#pOld').addEventListener('change', upd); $('#pLeft').addEventListener('input', upd); upd();
+      // остаток подставляем только при включении переноса и смене абонемента, а не пока человек печатает
+      const resetLeft = () => { const p = plans.find(x => x.id === planId); $('#pLeft').value = p.perWeek * p.weeks; };
+      $('#pPlans').addEventListener('click', () => { if ($('#pOld').checked) resetLeft(); upd(); });
+      $('#pStart').addEventListener('change', () => { $('#pStart').dataset.touched = '1'; upd(); }); $('#pPaid').addEventListener('change', upd);
+      $('#pOld').addEventListener('change', () => { if ($('#pOld').checked && !$('#pLeft').value) resetLeft(); upd(); }); $('#pLeft').addEventListener('input', upd); upd();
       $('#pForm').addEventListener('submit', e => {
         e.preventDefault();
         const p = plans.find(x => x.id === planId), old = $('#pOld').checked, paid = old || $('#pPaid').checked, s = $('#pStart').value || t, total = p.perWeek * p.weeks;
-        const left = Math.min(total, Math.max(0, Number($('#pLeft').value) || 0));
-        if (old && !left) { toast('Укажите, сколько занятий осталось'); return; }
+        const left = Number($('#pLeft').value) || 0;
+        if (old && !(left >= 1 && left <= total)) { toast(`Сколько осталось: от 1 до ${total}`); $('#pLeft').focus(); return; }
         const pass = { id: uid(), studentId: sid, perWeek: p.perWeek, weeks: p.weeks, total, price: Number($('#pPrice').value) || 0, paid, paidAt: paid && !old ? t : null, start: s, freezes: [] };
         if (old) { pass.carried = total - left; pass.imported = true; }
         db.passes.push(pass);
