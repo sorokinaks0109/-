@@ -70,7 +70,7 @@ function render() {
   showSync();
 }
 
-const meter = (p, st) => p.total > 24 ? '' : `<div class="meter" aria-hidden="true">${Array.from({ length: p.total }, (_, i) => `<i class="${i < st.left && (C.isLive(st) || st.key === 'future') ? 'on' : ''}"></i>`).join('')}</div>`;
+const meter = (p, st) => BF.meter(C, p, st);
 const exPill = s => s && s.example ? ' <span class="pill ex">пример</span>' : '';
 const nameOf = (r) => r.kind === 'join' ? r.payload.name : (C.studentById(r.studentId)?.name || 'Ученица');
 
@@ -336,6 +336,7 @@ function studentPage(sid) {
         <div class="status-top"><div class="eyebrow">Абонемент · ${raz(cur.perWeek)} в неделю</div><span class="pill ${st.tone}">${st.key === 'future' ? st.label : st.key === 'frozen' ? 'заморожен' : 'действует'}</span></div>
         <div class="big"><b>${st.left}</b><span>из ${cur.total} · до ${fmt(st.end)}</span></div>
         ${meter(cur, st)}
+        <details class="cal-wrap"><summary>Календарь посещений</summary>${BF.calendar(C, db, sid, cur, inbox.days[sid] || [], inbox.intents)}</details>
         ${C.unpaid(cur) ? `<div class="note">Не оплачен: ${rub(cur.price)} <button class="btn small" data-act="mark-paid" data-kind="pass" data-id="${cur.id}">Оплачено</button></div>` : ''}
         ${cur.freezes.length || (cur.extensions || []).length ? `<div class="hint">${cur.freezes.map(f => `${REASONS[f.reason] || 'Заморозка'}: ${fmt(f.from)} – ${fmt(f.to)} <button class="btn small ghost danger" data-act="del-freeze" data-pass="${cur.id}" data-id="${f.id}">убрать</button>`).join('<br>')}${(cur.extensions || []).length ? `${cur.freezes.length ? '<br>' : ''}Продлён из-за отмены занятий: +${C.extraDays(cur)} дн.` : ''}</div>` : ''}
         <div class="btns"><button class="btn" style="flex:1" data-act="freeze" data-id="${cur.id}">Заморозить</button>${s.remind ? `<button class="btn" style="flex:1" data-act="remind" data-id="${sid}">Напомнить</button>` : ''}</div>

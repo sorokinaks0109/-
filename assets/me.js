@@ -76,7 +76,7 @@ async function show(quiet) {
 }
 
 function draw() {
-  const db = { settings: card.settings, schedule: card.schedule || [], students: [card.student], passes: card.passes || [], visits: card.visits || [], cancels: card.cancels || [] };
+  const db = { settings: card.settings, schedule: card.schedule || [], students: [card.student], passes: card.passes || [], visits: (card.visits || []).map(v => ({ ...v, studentId: card.student.id })), cancels: card.cancels || [] };
   C = BF.calc(db);
   const s = card.student, t = today();
   const p = C.currentPass(s.id), st = p ? C.passState(p) : null;
@@ -86,7 +86,7 @@ function draw() {
   const up = C.upcoming(8);
   const pending = (card.requests || []).filter(r => r.status === 'new');
   const decided = (card.requests || []).filter(r => r.status !== 'new').slice(0, 3);
-  const meter = p && p.total <= 24 ? `<div class="meter" aria-hidden="true">${Array.from({ length: p.total }, (_, i) => `<i class="${i < st.left && (C.isLive(st) || st.key === 'future') ? 'on' : ''}"></i>`).join('')}</div>` : '';
+  const meter = BF.meter(C, p, st);
 
   let note = '';
   if (st && st.key === 'soon') note = `<div class="note">Абонемент скоро закончится: ${st.left <= db.settings.soonLessons ? `осталось ${zan(st.left)}` : `срок до ${fmt(st.end)}`}.</div>`;
@@ -107,6 +107,7 @@ function draw() {
       <div><span class="eyebrow">${C.isLive(st) ? 'Дней осталось' : 'Статус'}</span><b>${C.isLive(st) ? st.daysLeft + 1 : esc(st.label)}</b></div>
     </div>
   </section>` : `<section class="card ticket"><div class="eyebrow">Абонемента нет</div><p style="margin:0">Сейчас вы ходите разово, ${rub(db.settings.priceSingle)} за занятие.</p></section>`}
+  ${p ? `<section><div class="sec-title"><h2>Мой календарь</h2><span>${fmt(p.start)} – ${fmt(st.end)}</span></div>${BF.calendar(C, db, s.id, p, days, (intents || []).map(i => ({ ...i, studentId: s.id })))}</section>` : ''}
   ${note}
   ${p && p.paid === false && !pending.some(r => r.kind === 'payment' && r.payload.passId === p.id) ? `<div class="note">Абонемент ещё не оплачен: ${rub(p.price)}. <button class="btn small" data-act="pay-owed">Я оплатила</button></div>` : ''}
   ${(card.messages || []).length ? `<section class="msgs"><div class="eyebrow">Сообщения от преподавателя</div>${card.messages.slice(0, 3).map(m => `<div class="msg-item"><span class="hint">${fmt(m.date)}</span><p>${esc(m.text)}</p></div>`).join('')}</section>` : ''}
