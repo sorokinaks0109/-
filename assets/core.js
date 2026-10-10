@@ -1,4 +1,4 @@
-// Общие правила: даты, абонементы, страница ученицы. Используется и приложением преподавателя, и страницей ученицы.
+// Общие правила: даты, абонементы, кто придёт на занятие. Используется и приложением преподавателя, и страницей ученицы.
 (() => {
 'use strict';
 const BF = window.BF = window.BF || {};
@@ -10,6 +10,7 @@ const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date
 const today = () => iso(new Date());
 const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
 const diff = (a, b) => Math.round((parse(b) - parse(a)) / 86400000); // b - a в днях
+const weekStart = s => addDays(s, -((parse(s).getDay() + 6) % 7));
 const MONTHS = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 const MONTHS_NOM = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const DOW = ['вс','пн','вт','ср','чт','пт','сб'];
@@ -18,20 +19,30 @@ const fmt = s => { const d = parse(s); return `${d.getDate()} ${MONTHS[d.getMont
 const fmtDow = s => `${DOW[parse(s).getDay()]}, ${fmt(s)}`;
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? b : c; };
 const zan = n => `${n} ${plural(n, 'занятие', 'занятия', 'занятий')}`;
-const rub = n => `${Number(n).toLocaleString('ru-RU')} ₽`;
+const raz = n => `${n} ${plural(n, 'раз', 'раза', 'раз')}`;
+const rub = n => `${Number(n || 0).toLocaleString('ru-RU')} ₽`;
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const token = () => { const a = new Uint8Array(15); crypto.getRandomValues(a); return Array.from(a, b => 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 56]).join(''); };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const initials = name => name.trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
-const firstName = name => name.trim().split(/\s+/)[0] || name;
+const initials = name => String(name || '').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
+const firstName = name => String(name || '').trim().split(/\s+/)[0] || name;
 
-Object.assign(BF, { pad, iso, parse, today, addDays, diff, MONTHS, MONTHS_NOM, DOW, DOW_FULL, fmt, fmtDow, plural, zan, rub, uid, token, esc, initials, firstName });
+Object.assign(BF, { pad, iso, parse, today, addDays, diff, weekStart, MONTHS, MONTHS_NOM, DOW, DOW_FULL, fmt, fmtDow, plural, zan, raz, rub, uid, token, esc, initials, firstName });
 
-BF.REASONS = { sick: 'Болезнь (больничный)', trip: 'Командировка', vacation: 'Отпуск', other: 'Другое уважительное' };
-BF.DEFAULT_TEMPLATE = '{имя}, привет! В твоём абонементе осталось {осталось}, он действует до {до}. Если хочешь продолжать, продлим на следующем занятии.\nТвоя страница: {ссылка}';
+BF.REASONS = { sick: 'Болезнь', trip: 'Командировка', vacation: 'Отпуск', other: 'Другое' };
+BF.METHODS = { transfer: 'переводом', cash: 'наличными на занятии' };
+BF.DEFAULT_TEMPLATE = '{имя}, привет! В твоём абонементе осталось {осталось}, он действует до {до}. Продлить можно в приложении: {ссылка}';
 
 BF.defaults = () => ({
-  settings: { pricePerLesson: 500, priceSingle: 1000, soonLessons: 2, soonDays: 5, template: BF.DEFAULT_TEMPLATE, lastBackup: null },
+  settings: {
+    pricePerLesson: 500, priceSingle: 1000, soonLessons: 2, soonDays: 5,
+    template: BF.DEFAULT_TEMPLATE, lastBackup: null, payInfo: '',
+    plans: [
+      { id: 'p2', perWeek: 2, weeks: 4, price: 4000 },
+      { id: 'p3', perWeek: 3, weeks: 4, price: 6000 },
+      { id: 'p4', perWeek: 4, weeks: 4, price: 8000 },
+    ],
+  },
   schedule: [
     { id: 'c1', dow: 1, title: 'Растяжка', start: '18:00', end: '19:00' },
     { id: 'c2', dow: 2, title: 'Балет', start: '19:00', end: '20:30' },
@@ -40,8 +51,16 @@ BF.defaults = () => ({
   ],
   students: [], passes: [], visits: [],
 });
+BF.normalize = d => {
+  const def = BF.defaults();
+  const out = { ...def, ...(d || {}), settings: { ...def.settings, ...((d && d.settings) || {}) } };
+  if (!Array.isArray(out.settings.plans) || !out.settings.plans.length) out.settings.plans = def.settings.plans;
+  return out;
+};
+BF.planTitle = p => `${raz(p.perWeek)} в неделю`;
+BF.planSub = p => `${zan(p.perWeek * p.weeks)} · ${p.weeks} ${plural(p.weeks, 'неделя', 'недели', 'недель')}`;
 
-/* ---------- расчёты по абонементу ----------
+/* ---------- расчёты ----------
    Абонемент: perWeek × weeks занятий, действует weeks недель с даты начала плюс дни заморозок.
    Заканчивается, когда кончились занятия или прошёл срок. Остаток после срока сгорает. */
 BF.calc = db => {
@@ -73,16 +92,28 @@ BF.calc = db => {
   C.studentById = id => db.students.find(s => s.id === id);
   C.classById = id => db.schedule.find(c => c.id === id);
   C.classesFor = date => db.schedule.filter(c => c.dow === parse(date).getDay()).sort((a, b) => a.start < b.start ? -1 : 1);
+  C.sortedSchedule = () => [...db.schedule].sort((a, b) => ((a.dow + 6) % 7) - ((b.dow + 6) % 7) || (a.start < b.start ? -1 : 1));
+  C.isPast = (date, cls) => { if (date < today()) return true; if (date > today()) return false; const n = new Date(), [h, m] = cls.end.split(':').map(Number); return n.getHours() * 60 + n.getMinutes() > h * 60 + m; };
   C.upcoming = (count = 1) => {
-    const now = new Date(), out = [];
-    for (let i = 0; i < 14 && out.length < count; i++) {
+    const out = [];
+    for (let i = 0; i < 21 && out.length < count; i++) {
       const d = addDays(today(), i);
-      for (const c of C.classesFor(d)) {
-        if (i === 0) { const [h, m] = c.end.split(':').map(Number); if (now.getHours() * 60 + now.getMinutes() > h * 60 + m) continue; }
-        out.push({ date: d, cls: c }); if (out.length >= count) break;
-      }
+      for (const c of C.classesFor(d)) { if (C.isPast(d, c)) continue; out.push({ date: d, cls: c }); if (out.length >= count) break; }
     }
     return out;
+  };
+  // кто собирается прийти: постоянные дни минус «не приду» плюс «приду дополнительно»
+  C.expected = (date, classId, days, intents) => {
+    const coming = [], skipping = [];
+    db.students.forEach(s => {
+      const it = (intents || []).find(i => i.studentId === s.id && i.date === date && i.classId === classId);
+      const regular = (days[s.id] || []).includes(classId);
+      if (it && it.kind === 'extra') coming.push({ s, extra: true });
+      else if (regular && !(it && it.kind === 'skip')) coming.push({ s, extra: false });
+      else if (regular) skipping.push(s);
+    });
+    coming.sort((a, b) => a.s.name.localeCompare(b.s.name, 'ru'));
+    return { coming, skipping };
   };
   return C;
 };
@@ -90,50 +121,56 @@ BF.calc = db => {
 /* ---------- рисунок ---------- */
 BF.ballerina = '';
 BF.loadBallerina = async base => {
-  if (BF.ballerina) return BF.ballerina;
-  try { const r = await fetch(base + 'assets/ballerina.svg'); BF.ballerina = (await r.text()).replace('<svg ', '<svg aria-hidden="true" '); } catch (e) { BF.ballerina = ''; }
-  document.querySelectorAll('[data-ballerina]').forEach(el => { el.innerHTML = BF.ballerina; });
+  if (!BF.ballerina) {
+    try { const r = await fetch(base + 'assets/ballerina.svg'); BF.ballerina = (await r.text()).replace('<svg ', '<svg aria-hidden="true" '); } catch (e) { BF.ballerina = ''; }
+  }
+  document.querySelectorAll('[data-ballerina]').forEach(el => { if (!el.innerHTML) el.innerHTML = BF.ballerina; });
   return BF.ballerina;
 };
 
-/* ---------- страница ученицы ----------
-   card = { student, passes, visits, schedule, settings } — то, что сервер отдаёт по личной ссылке. */
-BF.studentView = card => {
-  const db = { settings: card.settings, schedule: card.schedule || [], students: [card.student], passes: card.passes || [], visits: card.visits || [] };
-  const C = BF.calc(db);
-  const s = card.student, t = today();
-  const p = C.currentPass(s.id);
-  const st = p ? C.passState(p) : null;
-  const visits = [...db.visits].sort((a, b) => a.date < b.date ? 1 : -1);
-  const up = C.upcoming(4);
-  const meter = p && p.total <= 24 ? `<div class="meter" aria-hidden="true">${Array.from({ length: p.total }, (_, i) => `<i class="${i < st.left && (C.isLive(st) || st.key === 'future') ? 'on' : ''}"></i>`).join('')}</div>` : '';
-  let note = '';
-  if (st && st.key === 'soon') note = `<div class="note">Абонемент скоро закончится${st.left <= db.settings.soonLessons ? `: осталось ${zan(st.left)}` : `: срок до ${fmt(st.end)}`}. Продлить можно на ближайшем занятии.</div>`;
-  if (st && st.key === 'used') note = '<div class="note bad">Занятия в абонементе закончились. Чтобы продолжать, оплатите новый абонемент на занятии.</div>';
-  if (st && st.key === 'expired') note = `<div class="note bad">Срок абонемента вышел ${fmt(st.end)}. Неиспользованные занятия сгорели: ${st.burned}.</div>`;
-  if (st && st.key === 'frozen') { const f = p.freezes.find(f => t >= f.from && t <= f.to); note = `<div class="note">Абонемент заморожен до ${fmt(f.to)}. Срок продлён на эти дни.</div>`; }
+/* ---------- фото: уменьшаем до 1280 px, чтобы не гонять большие файлы ---------- */
+BF.shrinkPhoto = file => new Promise((resolve, reject) => {
+  const img = new Image(), url = URL.createObjectURL(file);
+  img.onload = () => {
+    const k = Math.min(1, 1280 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    let q = .75, out = c.toDataURL('image/jpeg', q);
+    while (out.length > 900000 && q > .3) { q -= .15; out = c.toDataURL('image/jpeg', q); }
+    resolve(out);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Не получилось открыть фото')); };
+  img.src = url;
+});
 
-  return `
-  <section class="me-hero">
-    <div><h1>${esc(firstName(s.name))}</h1><p>Ballet Forever · мой абонемент</p></div>
-    <div class="ballerina" data-ballerina>${BF.ballerina}</div>
-  </section>
-  ${p ? `<section class="card ticket">
-    <div class="eyebrow">${st.key === 'future' ? `Абонемент с ${fmt(p.start)}` : 'Осталось занятий'}</div>
-    <div class="big"><b>${st.key === 'expired' ? 0 : st.left}</b><span>из ${p.total}</span></div>
-    ${meter}
-    <div class="facts">
-      <div><span class="eyebrow">Действует до</span><b>${fmt(st.end)}</b></div>
-      <div><span class="eyebrow">${st.daysLeft >= 0 ? 'Дней осталось' : 'Статус'}</span><b>${st.daysLeft >= 0 && C.isLive(st) ? st.daysLeft + 1 : esc(st.label)}</b></div>
-      <div><span class="eyebrow">В неделю</span><b>${p.perWeek} ${plural(p.perWeek, 'раз', 'раза', 'раз')}</b></div>
-      <div><span class="eyebrow">Начало</span><b>${fmt(p.start)}</b></div>
-    </div>
-    ${(p.freezes || []).length ? `<p class="hint">Заморозки: ${p.freezes.map(f => `${fmt(f.from)} – ${fmt(f.to)}`).join(', ')}. Срок продлён на ${C.frozenDays(p)} дн.</p>` : ''}
-  </section>` : `<section class="card ticket"><div class="eyebrow">Абонемента нет</div><p style="margin:0">Вы ходите на разовые занятия, ${rub(db.settings.priceSingle)} за занятие. Абонемент выгоднее: ${rub(db.settings.pricePerLesson)} за занятие.</p></section>`}
-  ${note}
-  ${up.length ? `<section><div class="sec-title"><h2>Афиша</h2><span>ближайшие занятия</span></div>
-    <div class="list afisha">${up.map(u => `<div class="row"><div class="day">${DOW[parse(u.date).getDay()]}</div><div class="main"><div class="name">${esc(u.cls.title)}</div><div class="sub num">${fmt(u.date)}, ${u.cls.start}–${u.cls.end}</div></div></div>`).join('')}</div></section>` : ''}
-  <section><div class="sec-title"><h2>Мои занятия</h2><span class="num">${visits.length ? visits.length : ''}</span></div>
-    <div class="list">${visits.length ? visits.slice(0, 40).map(v => `<div class="row" style="min-height:48px"><div class="main"><div class="num">${fmtDow(v.date)}</div><div class="sub">${esc(C.classById(v.classId)?.title || 'занятие')}</div></div><span class="pill ${v.kind === 'single' ? 'mute' : 'ok'}">${v.kind === 'single' ? 'разово' : 'абонемент'}</span></div>`).join('') : '<div class="empty">Пока нет отмеченных занятий.</div>'}</div></section>`;
+/* ---------- общие кусочки интерфейса ---------- */
+BF.ui = {
+  toast(text) {
+    const t = document.createElement('div'); t.className = 'toast'; t.textContent = text; t.setAttribute('role', 'status');
+    document.body.appendChild(t); setTimeout(() => t.remove(), 2600);
+  },
+  ICON_CHECK: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  ICON_BACK: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  // Экран поверх основного: шапка с «Назад», содержимое прокручивается, кнопки не прячутся под панелью браузера.
+  page(html, { title, onMount, onAction }) {
+    BF.ui.closePage();
+    const el = document.createElement('div'); el.className = 'page'; el.id = 'page'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+    el.innerHTML = `<div class="page-head"><button class="iconbtn" data-act="close" aria-label="Назад">${BF.ui.ICON_BACK}</button><h2>${title}</h2></div><div class="page-body">${html}</div>`;
+    el.addEventListener('click', e => { const a = e.target.closest('[data-act]'); if (a && a.dataset.act === 'close') { BF.ui.closePage(); return; } onAction && onAction(e); });
+    document.body.appendChild(el); document.body.classList.add('has-page');
+    onMount && onMount(el.querySelector('.page-body'));
+    return el;
+  },
+  closePage() { const p = document.getElementById('page'); if (p) p.remove(); document.body.classList.remove('has-page'); },
+  async copy(text, okMsg) {
+    try { await navigator.clipboard.writeText(text); BF.ui.toast(okMsg); return true; }
+    catch (e) {
+      const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+      let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
+      ta.remove(); BF.ui.toast(ok ? okMsg : 'Не получилось скопировать, выделите текст вручную'); return ok;
+    }
+  },
 };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') BF.ui.closePage(); });
 })();
