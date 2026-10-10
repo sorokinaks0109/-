@@ -110,7 +110,7 @@ function renderWeek() {
     const past = C.isPast(selDate, cls);
     const marked = visits.length > 0;
     const names = marked ? visits.map(v => C.studentById(v.studentId)?.name).filter(Boolean)
-      : exp.coming.map(x => x.s.name + (x.extra ? ' (доп.)' : ''));
+      : exp.coming.map(x => x.s.name);
     return `<article class="card cls">
       <div class="cls-head"><div class="cls-time disp">${cls.start}</div><div class="main"><h3>${esc(cls.title)}</h3><div class="hint num">${cls.start}–${cls.end}</div></div></div>
       <div class="cls-who">
@@ -393,8 +393,11 @@ function renderInbox() {
       <div class="btns"><button class="btn primary" data-act="approve" data-id="${r.id}">Принять</button><button class="btn" data-act="reject" data-id="${r.id}">Отклонить</button></div></article>`;
     if (r.kind === 'payment') {
       const p = r.payload;
+      if (p.existing) return `<article class="card req"><div class="eyebrow">Перенос абонемента · ${when}</div><h3>${esc(s?.name || 'Ученица')}</h3>
+        <p><b>Уже действующий абонемент</b>: ${raz(p.perWeek)} в неделю, с ${fmt(p.start)}, <b>осталось ${zan(Number(p.left) || 0)}</b>.<br><span class="hint">Сверьте с тетрадкой. Деньги за него получены раньше.</span></p>
+        <div class="btns"><button class="btn primary" data-act="approve" data-id="${r.id}">Подтвердить</button><button class="btn" data-act="reject" data-id="${r.id}">Отклонить</button></div></article>`;
       return `<article class="card req"><div class="eyebrow">Оплата · ${when}</div><h3>${esc(s?.name || 'Ученица')}</h3>
-        <p>${p.passId ? 'Оплата абонемента, который уже оформлен: ' : ''}<b>${raz(p.perWeek)} в неделю</b>, ${zan(p.perWeek * p.weeks)} на ${p.weeks} нед. · <b>${rub(p.price)}</b><br><span class="hint">${METHODS[p.method] || ''}${p.method === 'transfer' ? '. Проверьте поступление в банке.' : '. Получите деньги на занятии.'}</span></p>
+        <p>${p.passId ? 'Оплата абонемента, который уже оформлен: ' : ''}<b>${raz(p.perWeek)} в неделю</b>, ${zan(p.perWeek * p.weeks)}${p.start ? `, с ${fmt(p.start)}` : ''} · <b>${rub(p.price)}</b><br><span class="hint">${METHODS[p.method] || ''}${p.method === 'transfer' ? '. Проверьте поступление в банке.' : '. Получите деньги на занятии.'}</span></p>
         <div class="btns"><button class="btn primary" data-act="approve" data-id="${r.id}">Деньги получены</button><button class="btn" data-act="reject" data-id="${r.id}">Отклонить</button></div></article>`;
     }
     const p = r.payload;
@@ -417,9 +420,11 @@ async function decide(id, approve) {
       const owed = r.kind === 'payment' && r.payload.passId && db.passes.find(x => x.id === r.payload.passId && C.unpaid(x));
       if (owed) { owed.paid = true; owed.paidAt = today(); }
       else if (r.kind === 'payment') {
-        const p = r.payload, prev = C.studentPasses(r.studentId)[0];
-        let start = today(); if (prev) { const ps = C.passState(prev); if (C.isLive(ps)) start = addDays(ps.end, 1); }
-        db.passes.push({ id: uid(), studentId: r.studentId, perWeek: p.perWeek, weeks: p.weeks, total: p.perWeek * p.weeks, price: p.price, paid: true, paidAt: today(), start, freezes: [] });
+        const p = r.payload, prev = C.studentPasses(r.studentId)[0], total = p.perWeek * p.weeks;
+        let start = p.start || today(); if (!p.start && prev) { const ps = C.passState(prev); if (C.isLive(ps)) start = addDays(ps.end, 1); }
+        const pass = { id: uid(), studentId: r.studentId, perWeek: p.perWeek, weeks: p.weeks, total, price: p.price, paid: true, paidAt: p.existing ? null : today(), start, freezes: [] };
+        if (p.existing) { pass.carried = total - Math.min(total, Math.max(0, Number(p.left) || 0)); pass.imported = true; }
+        db.passes.push(pass);
       }
       if (r.kind === 'freeze') {
         const p = r.payload;
@@ -431,7 +436,7 @@ async function decide(id, approve) {
     }
     await Store.resolve(id, approve ? 'approved' : 'rejected');
     inbox.requests = inbox.requests.filter(x => x.id !== id);
-    toast(approve ? (r.kind === 'join' ? 'Ученица добавлена' : r.kind === 'payment' ? 'Абонемент записан' : 'Абонемент продлён') : 'Заявка отклонена');
+    toast(approve ? (r.kind === 'join' ? 'Ученица добавлена' : r.kind === 'payment' ? 'Абонемент оформлен' : 'Абонемент продлён') : 'Заявка отклонена');
     render();
   } catch (e) { toast(e.message); }
 }
@@ -581,7 +586,9 @@ function payForm(sid) {
       <p class="disp" style="font-size:20px;margin:0">${esc(C.studentById(sid).name)}</p>
       <div class="plan-cards" id="pPlans">${plans.map(p => `<button type="button" class="plan" data-id="${p.id}" aria-pressed="${p.id === planId}"><b>${BF.planTitle(p)}</b><span>${BF.planSub(p)}</span><em>${rub(p.price)}</em></button>`).join('')}</div>
       <div class="grid2"><label class="f">Начало<input type="date" id="pStart" value="${start}"></label><label class="f">Сумма, ₽<input type="number" inputmode="numeric" id="pPrice" min="0"></label></div>
-      <label class="switch">Уже оплачено<input type="checkbox" id="pPaid" checked></label>
+      <label class="switch">Абонемент уже идёт (перенос из тетрадки)<input type="checkbox" id="pOld"></label>
+      <label class="f" id="pLeftLine" hidden>Сколько занятий осталось<input type="number" inputmode="numeric" id="pLeft" min="1"></label>
+      <label class="switch" id="pPaidLine">Уже оплачено<input type="checkbox" id="pPaid" checked></label>
       <label class="switch" id="pConvLine" hidden><span id="pConvText"></span><input type="checkbox" id="pConv" checked></label>
       <div class="summary" id="pSum"></div>
       <button class="btn primary" type="submit">Оформить абонемент</button>
@@ -592,20 +599,29 @@ function payForm(sid) {
       const singlesFrom = s => db.visits.filter(v => v.studentId === sid && v.kind === 'single' && v.date >= s);
       const upd = () => {
         const p = plans.find(x => x.id === planId); $('#pPrice').value = p.price;
-        const s = $('#pStart').value || t, sg = singlesFrom(s);
-        $('#pConvLine').hidden = !sg.length;
+        const s = $('#pStart').value || t, sg = singlesFrom(s), old = $('#pOld').checked, total = p.perWeek * p.weeks;
+        $('#pLeftLine').hidden = !old; $('#pPaidLine').hidden = old;
+        $('#pLeft').max = total; if (!$('#pLeft').value || Number($('#pLeft').value) > total) $('#pLeft').value = total;
+        if (old && $('#pStart').value === t && !$('#pStart').dataset.touched) $('#pStart').value = addDays(t, -7);
+        $('#pConvLine').hidden = old || !sg.length;
         $('#pConvText').textContent = `Засчитать в абонемент разовые с ${fmt(s)}: ${sg.length}`;
-        $('#pSum').innerHTML = `<b>${zan(p.perWeek * p.weeks)}</b>, действует <b>с ${fmt(s)} по ${fmt(addDays(s, p.weeks * 7 - 1))}</b>.${$('#pPaid').checked ? '' : ' Будет в списке «Не оплачено», пока не отметите оплату.'}`;
+        const st0 = $('#pStart').value || t;
+        $('#pSum').innerHTML = old
+          ? `Действует <b>с ${fmt(st0)} по ${fmt(addDays(st0, p.weeks * 7 - 1))}</b>, осталось <b>${zan(Number($('#pLeft').value) || 0)}</b>. Деньги за него уже получены раньше, в выручку месяца он не попадёт.`
+          : `<b>${zan(total)}</b>, действует <b>с ${fmt(st0)} по ${fmt(addDays(st0, p.weeks * 7 - 1))}</b>.${$('#pPaid').checked ? '' : ' Будет в списке «Не оплачено», пока не отметите оплату.'}`;
       };
       $('#pPlans').addEventListener('click', e => { const b = e.target.closest('.plan'); if (!b) return; planId = b.dataset.id; $('#pPlans').querySelectorAll('.plan').forEach(x => x.setAttribute('aria-pressed', x === b)); upd(); });
-      $('#pStart').addEventListener('change', upd); $('#pPaid').addEventListener('change', upd); upd();
+      $('#pStart').addEventListener('change', () => { $('#pStart').dataset.touched = '1'; upd(); }); $('#pPaid').addEventListener('change', upd); $('#pOld').addEventListener('change', upd); $('#pLeft').addEventListener('input', upd); upd();
       $('#pForm').addEventListener('submit', e => {
         e.preventDefault();
-        const p = plans.find(x => x.id === planId), paid = $('#pPaid').checked, s = $('#pStart').value || t;
-        const pass = { id: uid(), studentId: sid, perWeek: p.perWeek, weeks: p.weeks, total: p.perWeek * p.weeks, price: Number($('#pPrice').value) || 0, paid, paidAt: paid ? t : null, start: s, freezes: [] };
+        const p = plans.find(x => x.id === planId), old = $('#pOld').checked, paid = old || $('#pPaid').checked, s = $('#pStart').value || t, total = p.perWeek * p.weeks;
+        const left = Math.min(total, Math.max(0, Number($('#pLeft').value) || 0));
+        if (old && !left) { toast('Укажите, сколько занятий осталось'); return; }
+        const pass = { id: uid(), studentId: sid, perWeek: p.perWeek, weeks: p.weeks, total, price: Number($('#pPrice').value) || 0, paid, paidAt: paid && !old ? t : null, start: s, freezes: [] };
+        if (old) { pass.carried = total - left; pass.imported = true; }
         db.passes.push(pass);
-        if (!$('#pConvLine').hidden && $('#pConv').checked) singlesFrom(s).slice(0, pass.total).forEach(v => { v.kind = 'pass'; v.passId = pass.id; delete v.price; delete v.paid; });
-        save(); toast(paid ? 'Абонемент оформлен' : 'Абонемент оформлен, ждёт оплаты'); render(); studentPage(sid);
+        if (!old && !$('#pConvLine').hidden && $('#pConv').checked) singlesFrom(s).slice(0, pass.total).forEach(v => { v.kind = 'pass'; v.passId = pass.id; delete v.price; delete v.paid; });
+        save(); toast(old ? 'Абонемент перенесён' : paid ? 'Абонемент оформлен' : 'Абонемент оформлен, ждёт оплаты'); render(); studentPage(sid);
       });
     },
   });
