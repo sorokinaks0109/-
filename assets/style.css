@@ -182,8 +182,8 @@ textarea { min-height: 96px; resize: vertical; }
 .footer-mark { text-align: center; color: var(--muted); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; padding-top: 8px; }
 
 /* вкладки сверху: нижняя панель Яндекс Браузера их не перекрывает */
-nav.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); margin-inline: -16px; padding-inline: 8px; }
-nav.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 12px 2px 10px; font-size: 14px; color: var(--muted); white-space: nowrap; }
+nav.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); display: flex; justify-content: space-between; gap: 4px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); margin-inline: -16px; padding-inline: 8px; }
+nav.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 12px 4px 10px; font-size: 13.5px; flex: 0 0 auto; color: var(--muted); white-space: nowrap; }
 nav.tabs button[aria-current="page"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 500; }
 nav.tabs .count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 600; margin-left: 2px; }
 body.logged-out nav.tabs, body.logged-out header.top { display: none; }
@@ -310,3 +310,27 @@ img.doc { width: 100%; border: 1px solid var(--line); border-radius: var(--r); b
 .bubble.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); border-radius: 14px 14px 4px 14px; }
 .bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .bubble span { display: block; font-size: 11px; opacity: .7; margin-top: 2px; }
+
+/* музыка */
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.grid3 > * { min-width: 0; }
+.exs { display: flex; flex-direction: column; gap: 12px; }
+.ex { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.ex-head { display: flex; gap: 8px; align-items: center; }
+.ex-head b { font-size: 22px; width: 22px; text-align: center; font-weight: 400; }
+.ex-head input { flex: 1; min-width: 0; font-weight: 500; }
+.ex-head .iconbtn { width: 36px; height: 36px; }
+.player { display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--ink); border-radius: var(--r); }
+.pl-ex { font-size: 32px; line-height: 1.1; }
+.pl-rep { font-size: 16px; color: var(--muted); min-height: 1em; }
+.pl-track { font-weight: 500; }
+.pl-bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.pl-bar i { display: block; height: 100%; background: var(--ink); }
+.pl-time { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.pl-count { font-size: 64px; text-align: center; line-height: 1; }
+.pl-btns { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 6px 0; }
+.iconbtn.big { width: 56px; height: 56px; font-size: 20px; }
+.pl-main { min-width: 140px; min-height: 56px; font-size: 18px; }
+.pl-step.cur { background: var(--soft); }
+.pl-step.cur .name { font-weight: 700; }
+.pl-step.done { opacity: .5; }

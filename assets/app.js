@@ -8,6 +8,7 @@ const BASE = new URL('./', location.href).href;
 let db, C, inbox = { requests: [], days: {}, intents: [], unread: [] };
 let tab = 'week', selDate = today(), studentFilter = '', moneyMonth = today().slice(0, 7);
 const setDb = d => { db = d; C = BF.calc(db); };
+BF.app = { db: () => db, save: () => Store.save(db) };
 const save = () => Store.save(db);
 const studentLink = s => `${BASE}me/?t=${s.token}`;
 const inviteLink = () => `${BASE}me/?join=${Store.invite}`;
@@ -66,9 +67,10 @@ function setTab(t) { tab = t; render(); window.scrollTo(0, 0); }
 function render() {
   const unreadBy = [...new Set((inbox.unread || []).map(m => m.studentId))];
   const n = inbox.requests.length + unreadBy.length;
-  tabsEl.innerHTML = [['week', 'Неделя'], ['students', 'Ученицы'], ['inbox', `Входящие${n ? ` <b class="count">${n}</b>` : ''}`], ['money', 'Деньги']]
+  tabsEl.innerHTML = [['week', 'Неделя'], ['students', 'Ученицы'], ['inbox', `Входящие${n ? ` <b class="count">${n}</b>` : ''}`], ['money', 'Деньги'], ['music', 'Музыка']]
     .map(([k, l]) => `<button data-tab="${k}" ${tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('');
-  ({ week: renderWeek, students: renderStudents, inbox: renderInbox, money: renderMoney, settings: renderSettings })[tab]();
+  if (tab === 'music') BF.music.render(app);
+  else ({ week: renderWeek, students: renderStudents, inbox: renderInbox, money: renderMoney, settings: renderSettings })[tab]();
   showSync();
 }
 
@@ -830,7 +832,7 @@ async function onAction(e, redraw) {
 app.addEventListener('click', e => onAction(e));
 
 async function refreshInbox(loud) {
-  try { inbox = await Store.inbox(); if (!document.getElementById('page')) render(); if (loud) toast(inbox.requests.length ? `Новых заявок: ${inbox.requests.length}` : 'Новых заявок нет'); }
+  try { inbox = await Store.inbox(); if (!document.getElementById('page') && tab !== 'music') render(); if (loud) toast(inbox.requests.length ? `Новых заявок: ${inbox.requests.length}` : 'Новых заявок нет'); }
   catch (e) { if (loud) toast(e.message); }
 }
 setInterval(() => { if (document.visibilityState === 'visible' && db) refreshInbox(false); }, 60000);
