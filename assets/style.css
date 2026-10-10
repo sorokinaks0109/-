@@ -302,3 +302,11 @@ img.doc { width: 100%; border: 1px solid var(--line); border-radius: var(--r); b
 .cal-legend .cd { width: 14px; height: 14px; margin: 0; display: inline-block; }
 .cal-wrap summary { cursor: pointer; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
 .cal-wrap[open] summary { margin-bottom: 10px; }
+
+/* переписка */
+.thread { display: flex; flex-direction: column; gap: 8px; max-height: 55vh; overflow-y: auto; }
+.msgs .thread { max-height: none; }
+.bubble { max-width: 85%; align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: 14px 14px 14px 4px; padding: 8px 12px; }
+.bubble.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); border-radius: 14px 14px 4px 14px; }
+.bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble span { display: block; font-size: 11px; opacity: .7; margin-top: 2px; }
