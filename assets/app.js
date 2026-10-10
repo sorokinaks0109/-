@@ -228,7 +228,7 @@ function cancelPage(date, classId) {
   const draw = body => {
     body.innerHTML = `
       <label class="f">Причина, её увидят ученицы<input type="text" id="cReason" maxlength="120" placeholder="Например: заболел преподаватель"></label>
-      <div><div class="eyebrow" style="margin-bottom:6px">Продлить абонемент на неделю</div>
+      <div><div class="eyebrow" style="margin-bottom:6px">Продлить абонемент на одно занятие</div>
         <div class="list card">${db.students.filter(s => live(s)).sort((a, b) => (pick.has(b.id) - pick.has(a.id)) || a.name.localeCompare(b.name, 'ru')).map(s => `<button class="row" data-act="pick" data-id="${s.id}" aria-pressed="${pick.has(s.id)}"><div class="check">${ui.ICON_CHECK}</div><div class="main"><div class="name">${esc(s.name)}</div><div class="sub">${exp.coming.some(x => x.s.id === s.id) ? 'собиралась прийти' : 'не собиралась'}</div></div></button>`).join('') || '<p class="empty">Ни у кого нет действующего абонемента.</p>'}</div>
         <p class="hint" style="margin-top:6px">Отмечены те, кто собирался прийти. Им придёт сообщение об отмене.</p></div>
       <button class="btn primary block" data-act="do-cancel">Отменить занятие</button>`;
@@ -242,16 +242,26 @@ function cancelPage(date, classId) {
       if (a.dataset.act === 'do-cancel') {
         const reason = body.querySelector('#cReason').value.trim(), cid = uid();
         const extended = [];
-        pick.forEach(sid => { const p = live(C.studentById(sid)); if (p) { (p.extensions = p.extensions || []).push({ id: uid(), days: 7, reason: 'cancel', cancelId: cid }); extended.push(sid); } });
+        pick.forEach(sid => { const p = live(C.studentById(sid)); if (p) { (p.extensions = p.extensions || []).push({ id: uid(), days: oneLessonDays(sid, p), reason: 'cancel', cancelId: cid }); extended.push(sid); } });
         db.cancels.push({ id: cid, date, classId, reason, extended });
         const to = [...new Set([...exp.coming.map(x => x.s.id), ...extended])];
-        const text = `Занятие «${cls.title}» ${fmtDow(date)} в ${cls.start} отменено${reason ? `: ${reason}` : ''}.${extended.length ? ' Абонемент продлён на неделю.' : ''}`;
+        const text = `Занятие «${cls.title}» ${fmtDow(date)} в ${cls.start} отменено${reason ? `: ${reason}` : ''}.${extended.length ? ' Абонемент продлён на одно занятие.' : ''}`;
         if (to.length) addMessage(text, to);
         save(); ui.closePage(); render(); toast('Занятие отменено');
         if (to.length) sharePage('Сообщение об отмене', `Ученицы увидят его в приложении. Можно также отправить в группу в Максе.`, text);
       }
     },
   });
+}
+// Продление на одно занятие: срок сдвигается до следующего её занятия после нынешнего конца абонемента.
+// Берём её постоянные дни, а если они не отмечены — любое занятие по расписанию.
+function oneLessonDays(sid, p) {
+  const end = C.passEnd(p), mine = inbox.days[sid] || [];
+  for (let k = 1; k <= 14; k++) {
+    const d = addDays(end, k);
+    if (C.classesFor(d).some(c => !mine.length || mine.includes(c.id))) return k;
+  }
+  return 7;
 }
 function addMessage(text, to) {
   db.messages = (db.messages || []).filter(m => m.date >= addDays(today(), -30));
@@ -344,7 +354,7 @@ function studentPage(sid) {
         ${meter(cur, st)}
         <details class="cal-wrap"><summary>Календарь посещений</summary>${BF.calendar(C, db, sid, cur, inbox.days[sid] || [], inbox.intents)}</details>
         ${C.unpaid(cur) ? `<div class="note">Не оплачен: ${rub(cur.price)} <button class="btn small" data-act="mark-paid" data-kind="pass" data-id="${cur.id}">Оплачено</button></div>` : ''}
-        ${cur.freezes.length || (cur.extensions || []).length ? `<div class="hint">${cur.freezes.map(f => `${REASONS[f.reason] || 'Заморозка'}: ${fmt(f.from)} – ${fmt(f.to)} <button class="btn small ghost danger" data-act="del-freeze" data-pass="${cur.id}" data-id="${f.id}">убрать</button>`).join('<br>')}${(cur.extensions || []).length ? `${cur.freezes.length ? '<br>' : ''}Продлён из-за отмены занятий: +${C.extraDays(cur)} дн.` : ''}</div>` : ''}
+        ${cur.freezes.length || (cur.extensions || []).length ? `<div class="hint">${cur.freezes.map(f => `${REASONS[f.reason] || 'Заморозка'}: ${fmt(f.from)} – ${fmt(f.to)} <button class="btn small ghost danger" data-act="del-freeze" data-pass="${cur.id}" data-id="${f.id}">убрать</button>`).join('<br>')}${(cur.extensions || []).length ? `${cur.freezes.length ? '<br>' : ''}Продлён из-за отмены занятий: ${(cur.extensions || []).length} ${plural((cur.extensions || []).length, 'занятие', 'занятия', 'занятий')} (+${C.extraDays(cur)} дн.)` : ''}</div>` : ''}
         <div class="btns"><button class="btn" style="flex:1" data-act="freeze" data-id="${cur.id}">Заморозить</button>${s.remind ? `<button class="btn" style="flex:1" data-act="remind" data-id="${sid}">Напомнить</button>` : ''}</div>
       </div>
       <button class="btn block" data-act="pay" data-id="${sid}">Оформить следующий абонемент</button>`
