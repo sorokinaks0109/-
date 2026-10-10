@@ -174,7 +174,7 @@ Store.card = async tok => {
 Store.join = async (invite, name) => {
   if (sb) return rpc('join_studio', { p_invite: invite, p_name: name });
   const x = demo.extra();
-  if (invite !== x.invite) throw new Error(ERR['invite not found']);
+  // в демо подходит любой код приглашения: преподаватель и ученица могут быть в разных браузерах
   const tok = BF.token();
   x.requests.push({ id: BF.uid(), kind: 'join', token: tok, payload: { name: name.trim() }, status: 'new', createdAt: new Date().toISOString() });
   demo.putExtra(x); return tok;
